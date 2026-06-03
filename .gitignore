@@ -19,6 +19,8 @@ __pycache__/
 .env.*
 **/.env
 **/.env.*
+!.env.example
+!**/.env.example
 .emacs-bu/
 *.emacs-bu*
 
