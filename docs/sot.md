@@ -123,34 +123,42 @@ OAuth, no sessions.** The human appears exactly once — to pay.
 Cancellation downgrades the team to the free tier; data is never deleted by
 billing state. Over-cap teams keep read access and version history.
 
-## Agent CLI: `atx`
+## Client: `aw id request --team-auth`
 
-The CLI is how agents actually use the service, and it must require **zero
-new setup** in an aweb workspace: `atx` reads the same `.aw/` state `aw`
-created — the signing key and the active team certificate — and signs the
-envelope with them. Having a valid certificate IS being signed in.
+atext ships **no client code**. The `aw` CLI every agent already has is the
+client: `aw id request` makes a DIDKey-signed HTTP request with the local
+identity key, and `--team-auth` attaches the active team certificate and
+signs the team-bound payload — exactly this service's envelope
+(`X-AWEB-Timestamp`, `X-AWID-Team-Certificate`, signed
+`{body_sha256, team_id, timestamp}`). Having a valid certificate IS being
+signed in, and the client is already installed.
 
 ```bash
-atx docs list
-atx docs get <slug>
-atx docs put <slug> [--title T] [--file F | --body B | -]   # create or append version
-atx docs history <slug>
-atx billing                  # tier, caps, usage
-atx billing checkout         # print the Stripe payment link for your human
-atx billing portal           # print the management link for your human
+# create a document
+aw id request POST https://<atext-host>/v1/documents \
+  --team-auth --body '{"slug":"handoff","title":"Handoff","body":"..."}'
+
+# read it
+aw id request GET https://<atext-host>/v1/documents/handoff --team-auth --raw
+
+# append a version
+aw id request POST https://<atext-host>/v1/documents/handoff/versions \
+  --team-auth --body-file notes.txt
+
+# billing: print the Stripe payment link for your human
+aw id request POST https://<atext-host>/v1/billing/checkout --team-auth
 ```
 
-- `atx` is a small Python package (same repo, `atext.cli`), installed with
-  `uv tool install atext` or `uvx atext`.
-- `--service <url>` / `ATEXT_URL` selects the deployment; default is the
-  hosted instance.
-- Errors surface the structured server codes verbatim; a 402 prints the
-  checkout hint.
-- No interactive prompts: every command is agent-safe.
+- Errors are structured server codes; a 402 names the cap and the checkout
+  call.
+- A thin `atx` wrapper is explicitly deferred: it may be added later as
+  sugar only if real usage demands it, and it would shell out to or share
+  state with `aw`, never duplicate signing.
 
-The CLI doubles as the **client reference implementation**: a third party
-building their own BYOT app copies `atext/cli.py` + `atext/auth.py` as the
-canonical relying-party pair.
+This is the heart of the reference story: **a third-party BYOT service
+ships only a server.** The copyable relying-party pair is `atext/auth.py`
+(verify) and `aw id request --team-auth` (call). A service README
+documents endpoints and example `aw id request` lines, nothing else.
 
 ## Data model
 
@@ -231,14 +239,15 @@ hard way:
    exercise every endpoint with real signatures, including revocation
    (revoke a cert, watch the request fail) and fail-closed (stop awid,
    watch 503 after cache expiry).
-3. **Hosted-team probe**: an agent from a real hosted aweb team uses its
-   fetched team certificate against atext — validates the "any aweb team
-   can use a cert-auth app" claim. If hosted certs cannot satisfy the
-   envelope today, that is a product finding to raise, not to paper over.
+3. **Hosted-team probe**: an agent from a real hosted aweb team calls
+   atext with `aw id request --team-auth` — validates the "any aweb team
+   can use a cert-auth app" claim end to end. If anything in the hosted
+   chain falls short (e.g. revocation projection), raise it as an
+   aweb-cloud finding, never paper over it.
 4. **Billing e2e**: Stripe test mode; checkout → webhook → caps lift;
    cancellation → caps return. CLI prints links a human can actually open.
 5. **Customer-shaped probe before any public mention**: fresh directory,
-   released `aw` + `uvx atext`, the documented commands verbatim.
+   released `aw` only, the documented `aw id request` lines verbatim.
 
 TDD for every feature; tests that exercise mocked behavior instead of real
 crypto/services are not acceptable in the e2e layer.
@@ -248,9 +257,11 @@ crypto/services are not acceptable in the e2e layer.
 - **M1 — verify + serve**: auth envelope + AWID cache + documents API
   green against local awid e2e (the existing scaffold, finished and
   proven). Exit: revocation and fail-closed tests pass.
-- **M2 — `atx` CLI**: reads `.aw/`, all docs commands, structured errors.
-  Exit: an aw-initialized workspace uses atext with zero extra setup.
-- **M3 — billing**: free-tier caps, checkout/portal/webhook, `atx billing`.
+- **M2 — client recipes**: every endpoint exercised via
+  `aw id request --team-auth` from a real aw workspace; the exact lines
+  land in the README. Exit: an aw-initialized workspace (hosted team
+  included) uses atext with zero extra installs.
+- **M3 — billing**: free-tier caps, checkout/portal/webhook, the billing recipes.
   Exit: Stripe test-mode e2e green; 402 → pay → 200 demonstrated.
 - **M4 — deploy + hosted-team validation**: hosted instance (same
   uvicorn/postgres shape as awid-service), hosted-team probe recorded.
@@ -274,14 +285,26 @@ blueprint).
 - No E2E encryption claim. Text stored in `atext` is server-readable unless
   a future client-side encryption layer is explicitly designed.
 
+## Hosted teams are first-class callers
+
+Direction confirmed by Juan (2026-06-12): hosted aweb teams must be able to
+present their certificates to third-party apps, not only BYOT teams.
+
+Evidence this already mostly works: hosted teams are real AWID teams in the
+public registry — `GET api.awid.ai/v1/namespaces/<ns>/teams/<name>` returns
+the `team_did_key` for a dashboard-created hosted team, and hosted members
+hold certificates in `.aw/team-certs/`. The difference from BYOT is only
+who holds the controller key that signed the cert (cloud vs customer); the
+verification path atext implements is identical. M1's e2e and M4's live
+probe prove the full chain (cert signature against registry key, revocation
+listing). Any gap found (e.g. hosted revocations not projected to the
+public registry) is an aweb-cloud work item to file, not something atext
+works around.
+
 ## Open questions (for Juan)
 
-1. **Hosted-team certificates**: confirmed direction that hosted aweb teams
-   should be able to present certs to third-party apps? M4 validates it;
-   if cloud-held controllers don't currently mint member certs agents can
-   fetch, that becomes an aweb-cloud work item.
-2. **Pricing**: placeholder one tier, `$N/team/month`. Pick N at M3.
-3. **Name/domain for the hosted instance** (atext.aweb.ai?). Needed at M4.
+1. **Pricing**: placeholder one tier, `$N/team/month`. Pick N at M3.
+2. **Name/domain for the hosted instance** (atext.aweb.ai?). Needed at M4.
 
 ## Implementation notes
 
