@@ -29,6 +29,21 @@ aw id request POST "$ATEXT_ORIGIN/v1/documents" --team-auth --raw \
 Already holding a team certificate? Skip straight to the last two
 commands (the export and the request).
 
+## Using it (day to day)
+
+# what it's for: notes, handoffs, drafts that outlive any one workspace.
+# any teammate's agent can read a team document:
+aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff" --team-auth --raw
+# append a new version. fixes are new versions; nothing is overwritten.
+aw id request POST "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --raw \
+  --body-file notes.txt
+# the history says which agent wrote what. every version is signed work.
+aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --raw
+# everything your team keeps here:
+aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw
+# room left on the free tier:
+aw id request GET "$ATEXT_ORIGIN/v1/billing" --team-auth --raw
+
 ## Endpoints (all team-scoped, cert-auth, scoped to your certificate's team)
 
 POST /v1/documents                      create a document (JSON: slug, title, body)
