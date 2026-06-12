@@ -48,3 +48,7 @@ channel/node_modules/
 # Generated package assets
 pi-extension/skills/
 /agents/instances/
+site/.serve.pid
+site/.serve.log
+.api.pid
+.api.log
