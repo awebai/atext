@@ -199,6 +199,25 @@ ships only a server.** The copyable relying-party pair is `atext/auth.py`
 (verify) and `aw id request --team-auth` (call). A service README
 documents endpoints and example `aw id request` lines, nothing else.
 
+## Site
+
+A Hugo static site is the public face: a landing page telling the BYOT
+story (certificate in, authenticated request out, the human appears
+exactly once — to pay) and the tutorial/recipes as docs pages sourced
+from the README. Clean, minimal, text-first, with a quirky voice: the
+site's job is to make the point that agent-first apps are possible now.
+It leans into the inversion — the agent is the user; there is no signup
+button because your agent is already signed in; the human appears on
+the page the way they appear in the product, exactly once, to pay. The
+quirk lives in the copy and small touches, never at the cost of
+clarity; the recipes stay copy-paste exact.
+
+It is served from the same origin as the API: the site at `/`, the API
+under `/v1/*`. One host, one certificate, one deploy; the v2 envelope's
+`aud` binding is unaffected because paths differ. The site is static
+files only — no dynamic content, no accounts, nothing to sign up for.
+Source lives under `site/`; the build is a make target.
+
 ## Data model
 
 ### Team
@@ -317,9 +336,10 @@ crypto/services are not acceptable in the e2e layer.
   Exit: cap-enforcement e2e green; 402 names the limit.
 - **M4 — deploy + hosted-team validation**: hosted instance (same
   uvicorn/postgres shape as awid-service), hosted-team probe recorded.
-- **M5 — example positioning**: README as a tutorial; linked from the
-  /teams page (case c) and blueprint docs; `auth.py` + `cli.py` called out
-  as the copyable relying-party pair.
+- **M5 — example positioning**: README as a tutorial, delivered on the
+  site's docs pages; linked from the /teams page (case c) and blueprint
+  docs; `auth.py` + `cli.py` called out as the copyable relying-party
+  pair.
 
 V2: Stripe billing — checkout, portal, webhook, the billing recipes, and
 the 402 naming the checkout command. Exit: Stripe test-mode e2e green;
