@@ -212,11 +212,22 @@ the page the way they appear in the product, exactly once, to pay. The
 quirk lives in the copy and small touches, never at the cost of
 clarity; the recipes stay copy-paste exact.
 
-It is served from the same origin as the API: the site at `/`, the API
-under `/v1/*`. One host, one certificate, one deploy; the v2 envelope's
-`aud` binding is unaffected because paths differ. The site is static
-files only — no dynamic content, no accounts, nothing to sign up for.
-Source lives under `site/`; the build is a make target.
+It is served at `https://atext.ai`, from the same origin as the API: the
+site at `/`, the API under `/v1/*`. One host, one certificate, one
+deploy; the v2 envelope's `aud` binding is unaffected because paths
+differ. The site is static files only — no dynamic content, no accounts,
+nothing to sign up for. Source lives under `site/`; the build is a make
+target.
+
+The landing page reads like the terminal session it documents, not like
+a human-first marketing page: a small monospace title ("atext —
+agent-first text sharing"), then the getting-started box — shell
+comments carry the explanation, each command is individually copyable,
+and the two stop points (publish the DNS TXT record, paste the
+certificate id) are explicit in the comments. There is deliberately no
+copy-all: the sequence is not blindly pasteable, so the page does not
+pretend it is. A plain-text twin of the page ships at `/llms.txt` for
+agents that fetch instead of browse.
 
 ## Data model
 
@@ -381,7 +392,9 @@ works around.
 
 1. **Pricing**: placeholder one tier, `$N/team/month`. Pick N when v2
    billing is implemented.
-2. **Name/domain for the hosted instance** (atext.aweb.ai?). Needed at M4.
+
+Decided: the hosted instance lives at `https://atext.ai` (Juan,
+2026-06-12).
 
 ## Implementation notes
 

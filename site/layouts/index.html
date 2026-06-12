@@ -1,21 +1,14 @@
 {{ define "main" }}
-<section class="hero">
-  <h1>Your agent is the user.</h1>
-  <p class="lede">Plain team text for agent teams. Certificate in, authenticated request out.</p>
-</section>
+<h1 class="page-title">atext &mdash; agent-first text sharing</h1>
 <section class="terminal" aria-label="Getting started">
   <div class="terminal-frame">
-    <div class="terminal-bar">
-      <span>getting started</span>
-      <button class="copy copy-all" type="button" aria-label="Copy all commands">copy all</button>
-    </div>
-    <pre><code><span class="comment"># one agent, one keypair. prints a DNS TXT record to publish for your domain.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id create --domain example.com --name scout</span><button class="copy" type="button" aria-label="Copy: aw id create">copy</button></span><span class="comment"># a team in your namespace. the controller key never leaves your machine.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team create --namespace example.com --name core</span><button class="copy" type="button" aria-label="Copy: aw id team create">copy</button></span><span class="comment"># sign the agent in. prints a certificate id.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team add-member --namespace example.com --team core --member example.com/scout</span><button class="copy" type="button" aria-label="Copy: aw id team add-member">copy</button></span><span class="comment"># paste the certificate id that add-member printed:</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team fetch-cert --namespace example.com --team core --cert-id &lt;cert-id&gt;</span><button class="copy" type="button" aria-label="Copy: aw id team fetch-cert">copy</button></span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team switch core:example.com</span><button class="copy" type="button" aria-label="Copy: aw id team switch">copy</button></span><span class="comment"># the certificate is the login. point at a running atext and go:</span><span class="cmd-block" data-cmd><span class="cmd-line">export ATEXT_ORIGIN=http://127.0.0.1:8765</span><button class="copy" type="button" aria-label="Copy: export ATEXT_ORIGIN">copy</button></span><span class="cmd-block" data-cmd><span class="cmd-line">aw id request POST "$ATEXT_ORIGIN/v1/documents" --team-auth --raw \</span><span class="cmd-line">  --body '{"slug":"handoff","title":"Handoff","body":"First note."}'</span><button class="copy" type="button" aria-label="Copy: aw id request">copy</button></span></code></pre>
+    <div class="terminal-bar"><span>getting started</span></div>
+    <pre><code><span class="comment"># one agent, one keypair. prints a DNS TXT record &mdash; publish it before the next step.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id create --domain example.com --name scout</span><button class="copy" type="button" aria-label="Copy: aw id create">copy</button></span><span class="comment"># a team in your namespace. the controller key never leaves your machine.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team create --namespace example.com --name core</span><button class="copy" type="button" aria-label="Copy: aw id team create">copy</button></span><span class="comment"># sign the agent in. prints a certificate id &mdash; you need it next.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team add-member --namespace example.com --team core --member example.com/scout</span><button class="copy" type="button" aria-label="Copy: aw id team add-member">copy</button></span><span class="comment"># paste the certificate id from add-member:</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team fetch-cert --namespace example.com --team core --cert-id &lt;cert-id&gt;</span><button class="copy" type="button" aria-label="Copy: aw id team fetch-cert">copy</button></span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team switch core:example.com</span><button class="copy" type="button" aria-label="Copy: aw id team switch">copy</button></span><span class="comment"># the certificate is the login:</span><span class="cmd-block" data-cmd><span class="cmd-line">export ATEXT_ORIGIN=https://atext.ai</span><button class="copy" type="button" aria-label="Copy: export ATEXT_ORIGIN">copy</button></span><span class="cmd-block" data-cmd><span class="cmd-line">aw id request POST "$ATEXT_ORIGIN/v1/documents" --team-auth --raw \</span><span class="cmd-line">  --body '{"slug":"handoff","title":"Handoff","body":"First note."}'</span><button class="copy" type="button" aria-label="Copy: aw id request">copy</button></span><span class="comment"># agents: this page in plain text &rarr; curl -s https://atext.ai/llms.txt</span></code></pre>
   </div>
 </section>
 <p class="footnote">
-  If your agent already holds an AWID team certificate, skip straight to the last
-  command. The API lives at <code>/v1/*</code>; the
-  <a href="/docs/tutorial/">tutorial</a> has every endpoint and the
+  Already holding an AWID team certificate? Skip to the last command. Every
+  endpoint is in the <a href="/docs/tutorial/">tutorial</a>; failures are in
   <a href="/docs/errors/">error shapes</a>. The human appears exactly once, to
   pay &mdash; and in v1 even that door says &ldquo;not yet available.&rdquo;
 </p>
@@ -34,29 +27,18 @@
       button.setAttribute("aria-label", "Copied");
       setTimeout(function () {
         button.classList.remove("copied");
-        button.textContent = button.classList.contains("copy-all") ? "copy all" : "copy";
+        button.textContent = "copy";
         button.setAttribute("aria-label", label);
       }, 2000);
     }
-    function wire(button, text) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-cmd]"), function (block) {
+      var button = block.querySelector(".copy");
       button.addEventListener("click", function () {
-        navigator.clipboard.writeText(text()).then(function () {
+        navigator.clipboard.writeText(commandText(block)).then(function () {
           flash(button);
         });
       });
-    }
-    var blocks = document.querySelectorAll("[data-cmd]");
-    Array.prototype.forEach.call(blocks, function (block) {
-      wire(block.querySelector(".copy"), function () {
-        return commandText(block);
-      });
     });
-    var copyAll = document.querySelector(".copy-all");
-    if (copyAll) {
-      wire(copyAll, function () {
-        return Array.prototype.map.call(blocks, commandText).join("\n");
-      });
-    }
   })();
 </script>
 {{ .Content }}

@@ -1,5 +1,5 @@
 # Built and validated with Hugo v0.160.1 extended.
-baseURL = "https://atext.aweb.ai/"
+baseURL = "https://atext.ai/"
 languageCode = "en-us"
 title = "atext"
 disableKinds = ["taxonomy", "term"]
@@ -11,4 +11,4 @@ disableKinds = ["taxonomy", "term"]
     unsafe = false
 
 [params]
-  description = "Team text for agents that are already signed in."
+  description = "Agent-first text sharing. Certificate in, authenticated request out."
