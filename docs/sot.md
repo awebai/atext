@@ -130,24 +130,31 @@ so the relying-party path is self-contained and copyable.
 The claweb pattern, team-shaped: **no human accounts, no passwords, no
 OAuth, no sessions.** The human appears exactly once — to pay.
 
+Scope split: **v1 ships the caps and the read-only billing status; the
+Stripe integration (checkout, portal, webhook) is v2.** Caps are enforced
+from day one so no team is ever grandfathered into uncapped usage; in v1
+the structured 402 names the limit and states that subscriptions are not
+yet available. When v2 lands, the same 402 starts naming the checkout
+command and paying lifts the caps — no client change.
+
 - The subscription unit is the **team**. One active subscription covers
   every member of that team, current and future.
-- **Free tier** (so the whole flow works before any payment): per-team caps
+- **Free tier** (v1): per-team caps
   enforced server-side — `FREE_MAX_DOCUMENTS` (default 3) and
   `FREE_MAX_VERSIONS_PER_DOC` (default 50). Caps return a structured 402
-  naming the limit and the checkout command.
-- **Checkout**: any verified member requests it.
+  naming the limit.
+- **Checkout** (v2): any verified member requests it.
   `POST /v1/billing/checkout` (cert-auth) creates a Stripe Checkout Session
   for that team and returns the URL. The agent hands the URL to its human
   ("here is the payment link"); the human pays in the browser. The Stripe
   customer email is whatever the human enters at checkout — `atext` never
   collects it.
-- **Activation**: the Stripe webhook (`checkout.session.completed`,
+- **Activation** (v2): the Stripe webhook (`checkout.session.completed`,
   `customer.subscription.updated|deleted`) flips the team's subscription
   projection. All members are covered on the next request; no client change.
-- **Management**: `POST /v1/billing/portal` (cert-auth) returns a Stripe
-  customer-portal link for the paying human; `GET /v1/billing` returns the
-  team's tier, caps, and current usage to any member.
+- **Management**: `POST /v1/billing/portal` (v2, cert-auth) returns a
+  Stripe customer-portal link for the paying human; `GET /v1/billing` (v1)
+  returns the team's tier, caps, and current usage to any member.
 - Webhook handlers verify the Stripe signature, are idempotent by event id,
   and tolerate replay.
 
@@ -177,7 +184,7 @@ aw id request GET https://<atext-host>/v1/documents/handoff --team-auth --raw
 aw id request POST https://<atext-host>/v1/documents/handoff/versions \
   --team-auth --body-file notes.txt
 
-# billing: print the Stripe payment link for your human
+# billing (v2): print the Stripe payment link for your human
 aw id request POST https://<atext-host>/v1/billing/checkout --team-auth
 ```
 
@@ -247,12 +254,12 @@ Team-scoped (cert-auth):
 - `GET /v1/documents/{slug}/versions` — list version metadata.
 - `POST /v1/documents/{slug}/versions` — append a new text version.
 - `GET /v1/billing` — subscription status, caps, usage.
-- `POST /v1/billing/checkout` — Stripe Checkout URL for this team.
-- `POST /v1/billing/portal` — Stripe portal URL for this team.
+- `POST /v1/billing/checkout` — Stripe Checkout URL for this team (v2).
+- `POST /v1/billing/portal` — Stripe portal URL for this team (v2).
 
 Unauthenticated:
 
-- `POST /v1/stripe/webhook` — Stripe-signature-verified events.
+- `POST /v1/stripe/webhook` — Stripe-signature-verified events (v2).
 - `/live`, `/ready`, `/health` — ops.
 
 All team routes are scoped to the authenticated certificate's `team_id`. A
@@ -279,9 +286,10 @@ hard way:
    can use a cert-auth app" claim end to end. If anything in the hosted
    chain falls short (e.g. revocation projection), raise it as an
    aweb-cloud finding, never paper over it.
-4. **Billing e2e**: Stripe test mode; checkout → webhook → caps lift;
+4. **Billing e2e** (v2): Stripe test mode; checkout → webhook → caps lift;
    cancellation → caps return. The checkout recipe prints a link a human
-   can actually open.
+   can actually open. V1 tests cover cap enforcement and the structured
+   402 without Stripe.
 5. **Customer-shaped probe before any public mention**: fresh directory,
    released `aw` only, the documented `aw id request` lines verbatim.
 
@@ -300,13 +308,18 @@ crypto/services are not acceptable in the e2e layer.
   `aw id request --team-auth` from a real aw workspace; the exact lines
   land in the README. Exit: an aw-initialized workspace (hosted team
   included) uses atext with zero extra installs.
-- **M3 — billing**: free-tier caps, checkout/portal/webhook, the billing recipes.
-  Exit: Stripe test-mode e2e green; 402 → pay → 200 demonstrated.
+- **M3 — caps + billing status**: free-tier caps enforced server-side,
+  `GET /v1/billing` reporting tier/caps/usage, structured 402 at the cap.
+  Exit: cap-enforcement e2e green; 402 names the limit.
 - **M4 — deploy + hosted-team validation**: hosted instance (same
   uvicorn/postgres shape as awid-service), hosted-team probe recorded.
 - **M5 — example positioning**: README as a tutorial; linked from the
   /teams page (case c) and blueprint docs; `auth.py` + `cli.py` called out
   as the copyable relying-party pair.
+
+V2: Stripe billing — checkout, portal, webhook, the billing recipes, and
+the 402 naming the checkout command. Exit: Stripe test-mode e2e green;
+402 → pay → 200 demonstrated.
 
 Build note: this is a good candidate for a blueprint-created team to build
 (dogfood: the team that builds the BYOT example is itself created from a
@@ -342,7 +355,8 @@ works around.
 
 ## Open questions (for Juan)
 
-1. **Pricing**: placeholder one tier, `$N/team/month`. Pick N at M3.
+1. **Pricing**: placeholder one tier, `$N/team/month`. Pick N when v2
+   billing is implemented.
 2. **Name/domain for the hosted instance** (atext.aweb.ai?). Needed at M4.
 
 ## Implementation notes
