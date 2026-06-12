@@ -174,6 +174,19 @@ uv run pytest
 uv run uvicorn atext.api:create_app --factory --reload
 ```
 
+## Landing site
+
+The static landing/tutorial site lives in `site/` and is built with Hugo
+v0.160.1 (pinned by the `HUGO_VERSION` variable in `Makefile`):
+
+```bash
+make site
+```
+
+The build writes generated files to `site/public/`. Deploy serves those files at
+`/` on the same origin as the API routes under `/v1/*`.
+
+
 ## End-to-end smoke test
 
 Prerequisites:

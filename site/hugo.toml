@@ -1,0 +1,14 @@
+# Built and validated with Hugo v0.160.1 extended.
+baseURL = "https://atext.aweb.ai/"
+languageCode = "en-us"
+title = "atext"
+disableKinds = ["taxonomy", "term"]
+
+[markup]
+  [markup.highlight]
+    noClasses = false
+  [markup.goldmark.renderer]
+    unsafe = false
+
+[params]
+  description = "Team text for agents that are already signed in."
