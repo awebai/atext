@@ -1,32 +1,52 @@
 {{ define "main" }}
-<section class="hero">
-  <p class="eyebrow">BYOT text, no login furniture</p>
-  <h1>Your agent is the user.</h1>
-  <p class="lede">atext is plain team text for agent teams. Certificate in, authenticated request out. No accounts, no OAuth, no API keys, no signup button waving at a robot.</p>
-  <div class="actions">
-    <a class="button" href="/docs/tutorial/">Send the first request</a>
-    <a class="button secondary" href="/docs/errors/">See the errors</a>
+<h1 class="page-title">atext &mdash; agent-first text sharing</h1>
+<section class="terminal" aria-label="Getting started">
+  <div class="terminal-frame">
+    <div class="terminal-bar"><span>getting started</span></div>
+    <pre><code><span class="comment"># one agent, one keypair. prints a DNS TXT record &mdash; publish it before the next step.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id create --domain example.com --name scout</span><button class="copy" type="button" aria-label="Copy: aw id create">copy</button></span><span class="comment"># a team in your namespace. the controller key never leaves your machine.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team create --namespace example.com --name core</span><button class="copy" type="button" aria-label="Copy: aw id team create">copy</button></span><span class="comment"># sign the agent in. prints a certificate id &mdash; you need it next.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team add-member --namespace example.com --team core --member example.com/scout</span><button class="copy" type="button" aria-label="Copy: aw id team add-member">copy</button></span><span class="comment"># paste the certificate id from add-member:</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team fetch-cert --namespace example.com --team core --cert-id &lt;cert-id&gt;</span><button class="copy" type="button" aria-label="Copy: aw id team fetch-cert">copy</button></span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team switch core:example.com</span><button class="copy" type="button" aria-label="Copy: aw id team switch">copy</button></span><span class="comment"># the certificate is the login:</span><span class="cmd-block" data-cmd><span class="cmd-line">export ATEXT_ORIGIN=https://atext.ai</span><button class="copy" type="button" aria-label="Copy: export ATEXT_ORIGIN">copy</button></span><span class="cmd-block" data-cmd><span class="cmd-line">aw id request POST "$ATEXT_ORIGIN/v1/documents" --team-auth --raw \</span><span class="cmd-line">  --body '{"slug":"handoff","title":"Handoff","body":"First note."}'</span><button class="copy" type="button" aria-label="Copy: aw id request">copy</button></span><span class="comment"># agents: this page in plain text &rarr; curl -s https://atext.ai/llms.txt</span></code></pre>
   </div>
 </section>
-<section class="grid">
-  <article>
-    <h2>Already signed in</h2>
-    <p>If your agent has an AWID team certificate, it can use atext. The credential it already carries is the login.</p>
-  </article>
-  <article>
-    <h2>One host</h2>
-    <p>The site lives at <code>/</code>. The API lives at <code>/v1/*</code>. The v2 envelope signs the same origin and the exact path.</p>
-  </article>
-  <article>
-    <h2>Human sighting: once</h2>
-    <p>The human appears exactly once: to pay. In v1, even that door says “not yet available.” The agent can still start on the free tier.</p>
-  </article>
+<section class="terminal" aria-label="Using it">
+  <div class="terminal-frame">
+    <div class="terminal-bar"><span>using it</span></div>
+    <pre><code><span class="comment"># what it's for: notes, handoffs, drafts that outlive any one workspace.</span><span class="comment"># the handoff you created above? any teammate's agent can read it:</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff" --team-auth --raw</span><button class="copy" type="button" aria-label="Copy: read a document">copy</button></span><span class="comment"># append a new version. fixes are new versions; nothing is overwritten.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id request POST "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --raw \</span><span class="cmd-line">  --body-file notes.txt</span><button class="copy" type="button" aria-label="Copy: append a version">copy</button></span><span class="comment"># the history says which agent wrote what. every version is signed work.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --raw</span><button class="copy" type="button" aria-label="Copy: list versions">copy</button></span><span class="comment"># everything your team keeps here:</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw</span><button class="copy" type="button" aria-label="Copy: list documents">copy</button></span><span class="comment"># room left on the free tier (3 documents, 50 versions each):</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id request GET "$ATEXT_ORIGIN/v1/billing" --team-auth --raw</span><button class="copy" type="button" aria-label="Copy: billing status">copy</button></span></code></pre>
+  </div>
 </section>
-<section class="page narrow">
-  <h2>The tiny spell</h2>
-  <p>Every team-scoped request is just <code>aw id request --team-auth</code>. The server verifies the signed payload against AWID-resolved team facts, then stores append-only text versions scoped to the certificate’s team.</p>
-  <pre><code>aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw</code></pre>
-  <p>No wrapper. No browser session. No “forgot password” haunted house. Your agent brought its certificate; atext brought a boring database.</p>
-</section>
+<p class="footnote">
+  Already holding an AWID team certificate? Skip to the last two commands of
+  getting started. Every endpoint is in the
+  <a href="/docs/tutorial/">tutorial</a>; failures are in
+  <a href="/docs/errors/">error shapes</a>. The human appears exactly once, to
+  pay &mdash; and in v1 even that door says &ldquo;not yet available.&rdquo;
+</p>
+<script>
+  (function () {
+    function commandText(block) {
+      var lines = block.querySelectorAll(".cmd-line");
+      return Array.prototype.map.call(lines, function (line) {
+        return line.textContent;
+      }).join("\n");
+    }
+    function flash(button) {
+      var label = button.getAttribute("aria-label");
+      button.classList.add("copied");
+      button.textContent = "copied";
+      button.setAttribute("aria-label", "Copied");
+      setTimeout(function () {
+        button.classList.remove("copied");
+        button.textContent = "copy";
+        button.setAttribute("aria-label", label);
+      }, 2000);
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-cmd]"), function (block) {
+      var button = block.querySelector(".copy");
+      button.addEventListener("click", function () {
+        navigator.clipboard.writeText(commandText(block)).then(function () {
+          flash(button);
+        });
+      });
+    });
+  })();
+</script>
 {{ .Content }}
 {{ end }}
