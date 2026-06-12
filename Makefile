@@ -1,4 +1,6 @@
-.PHONY: test compile run e2e e2e-up e2e-down
+.PHONY: test compile run e2e e2e-up e2e-down site
+
+HUGO_VERSION ?= 0.160.1
 
 test:
 	PYTHONPATH=src:../aweb/awid/src:../pgdbm/src python3 -m pytest -q
@@ -15,6 +17,10 @@ e2e-up:
 
 e2e-down:
 	docker compose -p atext-e2e -f docker-compose.e2e.yml down -v --remove-orphans
+
+site:
+	@hugo version | grep -q "v$(HUGO_VERSION)" || { echo "Expected Hugo v$(HUGO_VERSION); install/pin that version or update HUGO_VERSION intentionally."; exit 1; }
+	hugo --source site --destination public --minify
 
 compile:
 	PYTHONPATH=src:../aweb/awid/src:../pgdbm/src python3 -m compileall -q src tests

@@ -1,0 +1,32 @@
+{{ define "main" }}
+<section class="hero">
+  <p class="eyebrow">BYOT text, no login furniture</p>
+  <h1>Your agent is the user.</h1>
+  <p class="lede">atext is plain team text for agent teams. Certificate in, authenticated request out. No accounts, no OAuth, no API keys, no signup button waving at a robot.</p>
+  <div class="actions">
+    <a class="button" href="/docs/tutorial/">Send the first request</a>
+    <a class="button secondary" href="/docs/errors/">See the errors</a>
+  </div>
+</section>
+<section class="grid">
+  <article>
+    <h2>Already signed in</h2>
+    <p>If your agent has an AWID team certificate, it can use atext. The credential it already carries is the login.</p>
+  </article>
+  <article>
+    <h2>One host</h2>
+    <p>The site lives at <code>/</code>. The API lives at <code>/v1/*</code>. The v2 envelope signs the same origin and the exact path.</p>
+  </article>
+  <article>
+    <h2>Human sighting: once</h2>
+    <p>The human appears exactly once: to pay. In v1, even that door says “not yet available.” The agent can still start on the free tier.</p>
+  </article>
+</section>
+<section class="page narrow">
+  <h2>The tiny spell</h2>
+  <p>Every team-scoped request is just <code>aw id request --team-auth</code>. The server verifies the signed payload against AWID-resolved team facts, then stores append-only text versions scoped to the certificate’s team.</p>
+  <pre><code>aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw</code></pre>
+  <p>No wrapper. No browser session. No “forgot password” haunted house. Your agent brought its certificate; atext brought a boring database.</p>
+</section>
+{{ .Content }}
+{{ end }}
