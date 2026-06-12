@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from pgdbm import AsyncDatabaseManager
 
 from atext.auth import Principal
+from atext.config import Settings
 
 
 async def create_document(
@@ -55,6 +56,43 @@ async def create_document(
             raise HTTPException(status_code=409, detail="Document slug already exists for this team") from exc
         raise
     return await get_document(db, principal=principal, slug=slug)
+
+
+async def get_billing_status(
+    db: AsyncDatabaseManager,
+    *,
+    principal: Principal,
+    settings: Settings,
+) -> dict:
+    row = await db.fetch_one(
+        """
+        SELECT COUNT(DISTINCT d.document_id) AS documents,
+               COUNT(v.version_id) AS versions,
+               COALESCE(MAX(per_doc.version_count), 0) AS max_versions_per_doc
+        FROM {{tables.documents}} d
+        LEFT JOIN {{tables.document_versions}} v ON v.document_id = d.document_id
+        LEFT JOIN (
+            SELECT document_id, COUNT(*) AS version_count
+            FROM {{tables.document_versions}}
+            GROUP BY document_id
+        ) per_doc ON per_doc.document_id = d.document_id
+        WHERE d.team_id = $1
+        """,
+        principal.team_id,
+    )
+    usage = dict(row or {})
+    return {
+        "tier": "free",
+        "caps": {
+            "max_documents": settings.free_max_documents,
+            "max_versions_per_doc": settings.free_max_versions_per_doc,
+        },
+        "usage": {
+            "documents": int(usage.get("documents") or 0),
+            "versions": int(usage.get("versions") or 0),
+            "max_versions_per_doc": int(usage.get("max_versions_per_doc") or 0),
+        },
+    }
 
 
 async def list_documents(db: AsyncDatabaseManager, *, principal: Principal) -> list[dict]:

@@ -2,14 +2,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from pgdbm import AsyncDatabaseManager
 
 from atext.auth import AWIDTeamCache, Principal, authenticate_request
 from atext.config import Settings, get_settings
 from atext.db import ATextDatabase
 from atext.models import (
-    AppendVersionRequest,
     CreateDocumentRequest,
     DocumentResponse,
     DocumentSummary,
@@ -18,6 +17,7 @@ from atext.models import (
 from atext.repository import (
     append_version,
     create_document,
+    get_billing_status,
     get_document,
     list_documents,
     list_versions,
@@ -64,6 +64,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return await authenticate_request(request, settings=resolved, team_cache=cache, db=database)
 
     @app.get("/health")
+    @app.get("/live")
+    @app.get("/ready")
     async def health() -> dict[str, str]:
         return {"status": "ok", "service": "atext"}
 
@@ -104,8 +106,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         actor: Annotated[Principal, Depends(principal)],
         database: Annotated[AsyncDatabaseManager, Depends(db)],
     ) -> dict:
-        payload = AppendVersionRequest.model_validate(await request.json())
-        return await append_version(database, principal=actor, slug=slug, body=payload.body)
+        raw_body = await request.body()
+        try:
+            body = raw_body.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise HTTPException(status_code=400, detail="Version body must be valid UTF-8") from exc
+        return await append_version(database, principal=actor, slug=slug, body=body)
+
+    @app.get("/v1/billing")
+    async def billing_route(
+        actor: Annotated[Principal, Depends(principal)],
+        database: Annotated[AsyncDatabaseManager, Depends(db)],
+    ) -> dict:
+        return await get_billing_status(database, principal=actor, settings=resolved)
 
     @app.get("/v1/documents/{slug}/versions", response_model=list[DocumentVersion])
     async def list_versions_route(

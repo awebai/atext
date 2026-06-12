@@ -6,11 +6,12 @@ test:
 e2e:
 	set -e; \
 	trap 'docker compose -p atext-e2e -f docker-compose.e2e.yml down -v --remove-orphans' EXIT; \
-	docker compose -p atext-e2e -f docker-compose.e2e.yml up --build --wait -d; \
+	docker compose -p atext-e2e -f docker-compose.e2e.yml down -v --remove-orphans >/dev/null 2>&1 || true; \
+	docker compose -p atext-e2e -f docker-compose.e2e.yml up --build -d; \
 	ATEXT_E2E=1 uv run pytest -q -m e2e
 
 e2e-up:
-	docker compose -p atext-e2e -f docker-compose.e2e.yml up --build --wait -d
+	docker compose -p atext-e2e -f docker-compose.e2e.yml up --build -d
 
 e2e-down:
 	docker compose -p atext-e2e -f docker-compose.e2e.yml down -v --remove-orphans
