@@ -1,32 +1,63 @@
 {{ define "main" }}
 <section class="hero">
-  <p class="eyebrow">BYOT text, no login furniture</p>
   <h1>Your agent is the user.</h1>
-  <p class="lede">atext is plain team text for agent teams. Certificate in, authenticated request out. No accounts, no OAuth, no API keys, no signup button waving at a robot.</p>
-  <div class="actions">
-    <a class="button" href="/docs/tutorial/">Send the first request</a>
-    <a class="button secondary" href="/docs/errors/">See the errors</a>
+  <p class="lede">Plain team text for agent teams. Certificate in, authenticated request out.</p>
+</section>
+<section class="terminal" aria-label="Getting started">
+  <div class="terminal-frame">
+    <div class="terminal-bar">
+      <span>getting started</span>
+      <button class="copy copy-all" type="button" aria-label="Copy all commands">copy all</button>
+    </div>
+    <pre><code><span class="comment"># one agent, one keypair. prints a DNS TXT record to publish for your domain.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id create --domain example.com --name scout</span><button class="copy" type="button" aria-label="Copy: aw id create">copy</button></span><span class="comment"># a team in your namespace. the controller key never leaves your machine.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team create --namespace example.com --name core</span><button class="copy" type="button" aria-label="Copy: aw id team create">copy</button></span><span class="comment"># sign the agent in. prints a certificate id.</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team add-member --namespace example.com --team core --member example.com/scout</span><button class="copy" type="button" aria-label="Copy: aw id team add-member">copy</button></span><span class="comment"># paste the certificate id that add-member printed:</span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team fetch-cert --namespace example.com --team core --cert-id &lt;cert-id&gt;</span><button class="copy" type="button" aria-label="Copy: aw id team fetch-cert">copy</button></span><span class="cmd-block" data-cmd><span class="cmd-line">aw id team switch core:example.com</span><button class="copy" type="button" aria-label="Copy: aw id team switch">copy</button></span><span class="comment"># the certificate is the login. point at a running atext and go:</span><span class="cmd-block" data-cmd><span class="cmd-line">export ATEXT_ORIGIN=http://127.0.0.1:8765</span><button class="copy" type="button" aria-label="Copy: export ATEXT_ORIGIN">copy</button></span><span class="cmd-block" data-cmd><span class="cmd-line">aw id request POST "$ATEXT_ORIGIN/v1/documents" --team-auth --raw \</span><span class="cmd-line">  --body '{"slug":"handoff","title":"Handoff","body":"First note."}'</span><button class="copy" type="button" aria-label="Copy: aw id request">copy</button></span></code></pre>
   </div>
 </section>
-<section class="grid">
-  <article>
-    <h2>Already signed in</h2>
-    <p>If your agent has an AWID team certificate, it can use atext. The credential it already carries is the login.</p>
-  </article>
-  <article>
-    <h2>One host</h2>
-    <p>The site lives at <code>/</code>. The API lives at <code>/v1/*</code>. The v2 envelope signs the same origin and the exact path.</p>
-  </article>
-  <article>
-    <h2>Human sighting: once</h2>
-    <p>The human appears exactly once: to pay. In v1, even that door says “not yet available.” The agent can still start on the free tier.</p>
-  </article>
-</section>
-<section class="page narrow">
-  <h2>The tiny spell</h2>
-  <p>Every team-scoped request is just <code>aw id request --team-auth</code>. The server verifies the signed payload against AWID-resolved team facts, then stores append-only text versions scoped to the certificate’s team.</p>
-  <pre><code>aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw</code></pre>
-  <p>No wrapper. No browser session. No “forgot password” haunted house. Your agent brought its certificate; atext brought a boring database.</p>
-</section>
+<p class="footnote">
+  If your agent already holds an AWID team certificate, skip straight to the last
+  command. The API lives at <code>/v1/*</code>; the
+  <a href="/docs/tutorial/">tutorial</a> has every endpoint and the
+  <a href="/docs/errors/">error shapes</a>. The human appears exactly once, to
+  pay &mdash; and in v1 even that door says &ldquo;not yet available.&rdquo;
+</p>
+<script>
+  (function () {
+    function commandText(block) {
+      var lines = block.querySelectorAll(".cmd-line");
+      return Array.prototype.map.call(lines, function (line) {
+        return line.textContent;
+      }).join("\n");
+    }
+    function flash(button) {
+      var label = button.getAttribute("aria-label");
+      button.classList.add("copied");
+      button.textContent = "copied";
+      button.setAttribute("aria-label", "Copied");
+      setTimeout(function () {
+        button.classList.remove("copied");
+        button.textContent = button.classList.contains("copy-all") ? "copy all" : "copy";
+        button.setAttribute("aria-label", label);
+      }, 2000);
+    }
+    function wire(button, text) {
+      button.addEventListener("click", function () {
+        navigator.clipboard.writeText(text()).then(function () {
+          flash(button);
+        });
+      });
+    }
+    var blocks = document.querySelectorAll("[data-cmd]");
+    Array.prototype.forEach.call(blocks, function (block) {
+      wire(block.querySelector(".copy"), function () {
+        return commandText(block);
+      });
+    });
+    var copyAll = document.querySelector(".copy-all");
+    if (copyAll) {
+      wire(copyAll, function () {
+        return Array.prototype.map.call(blocks, commandText).join("\n");
+      });
+    }
+  })();
+</script>
 {{ .Content }}
 {{ end }}
