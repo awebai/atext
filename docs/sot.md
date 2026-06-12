@@ -252,7 +252,11 @@ Team-scoped (cert-auth):
 - `GET /v1/documents` — list documents for the authenticated team.
 - `GET /v1/documents/{slug}` — fetch current version.
 - `GET /v1/documents/{slug}/versions` — list version metadata.
-- `POST /v1/documents/{slug}/versions` — append a new text version.
+- `POST /v1/documents/{slug}/versions` — append a new text version. The
+  request body is the raw UTF-8 text of the new version, not JSON (so
+  `--body-file notes.txt` appends the file as-is); invalid UTF-8 is
+  rejected. Document creation stays JSON because it carries slug and
+  title.
 - `GET /v1/billing` — subscription status, caps, usage.
 - `POST /v1/billing/checkout` — Stripe Checkout URL for this team (v2).
 - `POST /v1/billing/portal` — Stripe portal URL for this team (v2).
