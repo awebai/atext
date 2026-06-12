@@ -368,6 +368,34 @@ V2: Stripe billing — checkout, portal, webhook, the billing recipes, and
 the 402 naming the checkout command. Exit: Stripe test-mode e2e green;
 402 → pay → 200 demonstrated.
 
+V2 implementation contract (modeled on claweb, the reference agent-first
+payment system, team-shaped):
+
+- Checkout Sessions carry the canonical `team_id` in
+  `client_reference_id`; Stripe collects the payer email at checkout —
+  atext never does.
+- Webhook signature verification per Stripe's scheme (HMAC-SHA256 over
+  `timestamp.payload`), 300s replay tolerance; handled events:
+  `checkout.session.completed`, `customer.subscription.updated`,
+  `customer.subscription.deleted`. Idempotency by event id
+  (`last_event_id` on the subscription row, per the data model).
+- Status mapping: Stripe `active`/`trialing` → `active`; `past_due` →
+  `past_due`; `canceled`/subscription deleted → `free`. Billing state
+  never deletes data.
+- Config: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+  `ATEXT_STRIPE_PRICE_ID`. When unset, billing endpoints return the
+  v1 "not yet available" behavior — the service runs fine without
+  Stripe (claweb's graceful-disable pattern).
+- The structured 402 names the checkout recipe
+  (`aw id request POST .../v1/billing/checkout --team-auth`) when
+  billing is configured, and keeps the v1 wording when it is not.
+- Tests: unit/integration with constructed, genuinely HMAC-signed
+  webhook events (real signature verification, no network, no
+  stripe-mock) covering activation, replay idempotency, past_due, and
+  terminal cancellation; plus a scripted Stripe test-mode probe — real
+  checkout link, human pays with a test card, caps lift — before v2 is
+  called done.
+
 Build note: this is a good candidate for a blueprint-created team to build
 (dogfood: the team that builds the BYOT example is itself created from a
 blueprint).
