@@ -547,10 +547,11 @@ def test_document_endpoints_versions_raw_utf8_and_attribution(
     assert appended["latest"]["certificate_id"] == team.certificate_id
 
     billing = _get_billing(atext, team)
+    assert billing["team_id"] == team.team_id
     assert billing["tier"] == "free"
     assert billing["caps"]["max_documents"] >= 1
     assert billing["caps"]["max_versions_per_doc"] >= 2
-    assert billing["usage"] == {"documents": 1, "versions": 2, "max_versions_per_doc": 2}
+    assert billing["usage"] == {"documents": 1, "max_versions_per_doc": 2}
 
     versions = _list_versions(atext, team, "handoff")
     assert [item["version_number"] for item in versions] == [2, 1]
@@ -677,3 +678,35 @@ def test_replay_negatives_reject_path_method_and_audience(
 
     wrong_aud = _aw_request(team, "GET", f"{atext.backend_origin}/v1/documents")
     _assert_aw_status(wrong_aud, 401, context="signed audience for backend host")
+
+
+def test_real_aw_free_document_cap_and_billing(atext: RunningAText, aw_workspace: AWWorkspace) -> None:
+    team = _provision_team(aw_workspace)
+
+    for index in range(3):
+        created = _create_document(
+            atext,
+            team,
+            slug=f"note-{index}",
+            title=f"Note {index}",
+            body="hello",
+        )
+        assert created["slug"] == f"note-{index}"
+
+    billing = _get_billing(atext, team)
+    assert billing["team_id"] == team.team_id
+    assert billing["tier"] == "free"
+    assert billing["caps"] == {"max_documents": 3, "max_versions_per_doc": 50}
+    assert billing["usage"] == {"documents": 3, "max_versions_per_doc": 1}
+
+    blocked = _aw_request(
+        team,
+        "POST",
+        f"{atext.origin}/v1/documents",
+        body=json.dumps({"slug": "note-3", "title": "Note 3", "body": "blocked"}),
+    )
+    assert blocked.returncode != 0
+    error_text = blocked.stdout + blocked.stderr
+    assert "free_tier_limit_exceeded" in error_text
+    assert "documents" in error_text
+    assert "subscriptions are not yet available" in error_text

@@ -8,15 +8,144 @@ from pgdbm import AsyncDatabaseManager
 from atext.auth import Principal
 from atext.config import Settings
 
+ACTIVE_TIER = "active"
+
+
+def _caps_for_tier(*, tier: str, settings: Settings) -> dict[str, int | None]:
+    if tier == ACTIVE_TIER:
+        return {"max_documents": None, "max_versions_per_doc": None}
+    return {
+        "max_documents": settings.free_max_documents,
+        "max_versions_per_doc": settings.free_max_versions_per_doc,
+    }
+
+
+def _limit_exceeded(*, limit: str, current: int, maximum: int) -> HTTPException:
+    return HTTPException(
+        status_code=402,
+        detail={
+            "code": "free_tier_limit_exceeded",
+            "limit": limit,
+            "current": current,
+            "max": maximum,
+            "subscriptions_available": False,
+            "message": "Free tier limit reached; subscriptions are not yet available.",
+        },
+    )
+
+
+async def ensure_subscription(db: AsyncDatabaseManager, *, team_id: str) -> str:
+    await db.execute(
+        """
+        INSERT INTO {{tables.subscriptions}} (team_id, tier)
+        VALUES ($1, 'free')
+        ON CONFLICT (team_id) DO NOTHING
+        """,
+        team_id,
+    )
+    row = await db.fetch_one(
+        "SELECT tier FROM {{tables.subscriptions}} WHERE team_id = $1",
+        team_id,
+    )
+    if row is None:
+        return "free"
+    return str(row["tier"] or "free")
+
+
+async def _team_usage(db: AsyncDatabaseManager, *, team_id: str) -> dict[str, int]:
+    document_count = await db.fetch_one(
+        "SELECT COUNT(*) AS n FROM {{tables.documents}} WHERE team_id = $1",
+        team_id,
+    )
+    max_versions = await db.fetch_one(
+        """
+        SELECT COALESCE(MAX(version_count), 0) AS n
+        FROM (
+            SELECT COUNT(*) AS version_count
+            FROM {{tables.documents}} d
+            JOIN {{tables.document_versions}} v ON v.document_id = d.document_id
+            WHERE d.team_id = $1
+            GROUP BY d.document_id
+        ) counts
+        """,
+        team_id,
+    )
+    return {
+        "documents": int(document_count["n"] if document_count is not None else 0),
+        "max_versions_per_doc": int(max_versions["n"] if max_versions is not None else 0),
+    }
+
+
+async def get_billing_status(
+    db: AsyncDatabaseManager,
+    *,
+    principal: Principal,
+    settings: Settings,
+) -> dict:
+    tier = await ensure_subscription(db, team_id=principal.team_id)
+    return {
+        "team_id": principal.team_id,
+        "tier": tier,
+        "caps": _caps_for_tier(tier=tier, settings=settings),
+        "usage": await _team_usage(db, team_id=principal.team_id),
+    }
+
+
+async def _enforce_document_cap(
+    db: AsyncDatabaseManager,
+    *,
+    principal: Principal,
+    settings: Settings,
+) -> None:
+    tier = await ensure_subscription(db, team_id=principal.team_id)
+    if tier == ACTIVE_TIER:
+        return
+    row = await db.fetch_one(
+        "SELECT COUNT(*) AS n FROM {{tables.documents}} WHERE team_id = $1",
+        principal.team_id,
+    )
+    current = int(row["n"] if row is not None else 0)
+    if current >= settings.free_max_documents:
+        raise _limit_exceeded(
+            limit="documents",
+            current=current,
+            maximum=settings.free_max_documents,
+        )
+
+
+async def _enforce_version_cap(
+    db: AsyncDatabaseManager,
+    *,
+    principal: Principal,
+    document_id: UUID,
+    settings: Settings,
+) -> None:
+    tier = await ensure_subscription(db, team_id=principal.team_id)
+    if tier == ACTIVE_TIER:
+        return
+    row = await db.fetch_one(
+        "SELECT COUNT(*) AS n FROM {{tables.document_versions}} WHERE document_id = $1",
+        document_id,
+    )
+    current = int(row["n"] if row is not None else 0)
+    if current >= settings.free_max_versions_per_doc:
+        raise _limit_exceeded(
+            limit="versions_per_doc",
+            current=current,
+            maximum=settings.free_max_versions_per_doc,
+        )
+
 
 async def create_document(
     db: AsyncDatabaseManager,
     *,
     principal: Principal,
+    settings: Settings,
     slug: str,
     title: str,
     body: str,
 ) -> dict:
+    await _enforce_document_cap(db, principal=principal, settings=settings)
     document_id = uuid4()
     version_id = uuid4()
     try:
@@ -56,43 +185,6 @@ async def create_document(
             raise HTTPException(status_code=409, detail="Document slug already exists for this team") from exc
         raise
     return await get_document(db, principal=principal, slug=slug)
-
-
-async def get_billing_status(
-    db: AsyncDatabaseManager,
-    *,
-    principal: Principal,
-    settings: Settings,
-) -> dict:
-    row = await db.fetch_one(
-        """
-        SELECT COUNT(DISTINCT d.document_id) AS documents,
-               COUNT(v.version_id) AS versions,
-               COALESCE(MAX(per_doc.version_count), 0) AS max_versions_per_doc
-        FROM {{tables.documents}} d
-        LEFT JOIN {{tables.document_versions}} v ON v.document_id = d.document_id
-        LEFT JOIN (
-            SELECT document_id, COUNT(*) AS version_count
-            FROM {{tables.document_versions}}
-            GROUP BY document_id
-        ) per_doc ON per_doc.document_id = d.document_id
-        WHERE d.team_id = $1
-        """,
-        principal.team_id,
-    )
-    usage = dict(row or {})
-    return {
-        "tier": "free",
-        "caps": {
-            "max_documents": settings.free_max_documents,
-            "max_versions_per_doc": settings.free_max_versions_per_doc,
-        },
-        "usage": {
-            "documents": int(usage.get("documents") or 0),
-            "versions": int(usage.get("versions") or 0),
-            "max_versions_per_doc": int(usage.get("max_versions_per_doc") or 0),
-        },
-    }
 
 
 async def list_documents(db: AsyncDatabaseManager, *, principal: Principal) -> list[dict]:
@@ -156,6 +248,7 @@ async def append_version(
     db: AsyncDatabaseManager,
     *,
     principal: Principal,
+    settings: Settings,
     slug: str,
     body: str,
 ) -> dict:
@@ -167,13 +260,14 @@ async def append_version(
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
     document_id: UUID = document["document_id"]
+    await _enforce_version_cap(db, principal=principal, document_id=document_id, settings=settings)
     version_id = uuid4()
     async with db.transaction() as tx:
         current = await tx.fetch_one(
             "SELECT COALESCE(MAX(version_number), 0) AS n FROM {{tables.document_versions}} WHERE document_id = $1",
             document_id,
         )
-        next_version = int(current["n"] or 0) + 1
+        next_version = int(current["n"] if current is not None else 0) + 1
         await tx.execute(
             """
             INSERT INTO {{tables.document_versions}}

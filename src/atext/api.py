@@ -9,6 +9,7 @@ from atext.auth import AWIDTeamCache, Principal, authenticate_request
 from atext.config import Settings, get_settings
 from atext.db import ATextDatabase
 from atext.models import (
+    BillingResponse,
     CreateDocumentRequest,
     DocumentResponse,
     DocumentSummary,
@@ -79,6 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return await create_document(
             database,
             principal=actor,
+            settings=resolved,
             slug=payload.slug,
             title=payload.title,
             body=payload.body,
@@ -106,14 +108,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         actor: Annotated[Principal, Depends(principal)],
         database: Annotated[AsyncDatabaseManager, Depends(db)],
     ) -> dict:
-        raw_body = await request.body()
         try:
-            body = raw_body.decode("utf-8")
+            body = (await request.body()).decode("utf-8")
         except UnicodeDecodeError as exc:
             raise HTTPException(status_code=400, detail="Version body must be valid UTF-8") from exc
-        return await append_version(database, principal=actor, slug=slug, body=body)
+        return await append_version(database, principal=actor, settings=resolved, slug=slug, body=body)
 
-    @app.get("/v1/billing")
+    @app.get("/v1/billing", response_model=BillingResponse)
     async def billing_route(
         actor: Annotated[Principal, Depends(principal)],
         database: Annotated[AsyncDatabaseManager, Depends(db)],

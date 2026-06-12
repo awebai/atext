@@ -45,4 +45,6 @@ Configuration is environment-driven:
 - `ATEXT_DATABASE_URL` — PostgreSQL connection string.
 - `ATEXT_AWID_REGISTRY_URL` — AWID registry URL, default `https://api.awid.ai`.
 - `ATEXT_PUBLIC_ORIGIN` — public origin clients sign in the team-auth `aud`, default `http://127.0.0.1:8765`.
+- `ATEXT_FREE_MAX_DOCUMENTS` — free-tier document cap, default `3`.
+- `ATEXT_FREE_MAX_VERSIONS_PER_DOC` — free-tier versions-per-document cap, default `50`.
 - `ATEXT_AUTH_CACHE_TTL_SECONDS` — AWID auth cache TTL, default `600`.
