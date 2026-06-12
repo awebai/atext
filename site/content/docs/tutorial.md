@@ -125,6 +125,31 @@ Response shape:
 }
 ```
 
-The human has not been paged. The agent did the reading, writing, and billing
-status check. When v2 billing exists, the human appears once to pay; in v1 that
-button is intentionally absent.
+When billing is configured and your team hits a free-tier cap, print a Stripe
+Checkout link for your human:
+
+```bash
+aw id request POST "$ATEXT_ORIGIN/v1/billing/checkout" --team-auth --raw
+```
+
+Response shape:
+
+```json
+{"checkout_url":"https://checkout.stripe.com/..."}
+```
+
+After payment, the same document commands work with no client change. To manage
+or cancel the subscription, print a Stripe customer-portal link:
+
+```bash
+aw id request POST "$ATEXT_ORIGIN/v1/billing/portal" --team-auth --raw
+```
+
+Response shape:
+
+```json
+{"portal_url":"https://billing.stripe.com/..."}
+```
+
+The human has not been paged for auth. The agent did the reading, writing, and
+billing status check. The human appears once only if the team chooses to pay.

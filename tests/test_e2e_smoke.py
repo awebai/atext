@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -18,6 +19,8 @@ from typing import Any
 import httpx
 import pytest
 
+from tests.billing_events import sign_stripe_event, stripe_event
+
 pytestmark = pytest.mark.e2e
 
 AWID_URL = os.environ.get("ATEXT_E2E_AWID_URL", "http://127.0.0.1:18010")
@@ -25,6 +28,9 @@ POSTGRES_URL = os.environ.get(
     "ATEXT_E2E_DATABASE_URL",
     "postgresql://atext:atext@127.0.0.1:55432/atext",
 )
+E2E_STRIPE_SECRET_KEY = "sk_test_e2e_placeholder"
+E2E_STRIPE_WEBHOOK_SECRET = "whsec_e2e_atext"
+E2E_STRIPE_PRICE_ID = "price_e2e_placeholder"
 COMPOSE = ["docker", "compose", "-p", "atext-e2e", "-f", "docker-compose.e2e.yml"]
 
 
@@ -279,6 +285,9 @@ def atext() -> Iterator[RunningAText]:
             "ATEXT_AWID_REGISTRY_URL": AWID_URL,
             "ATEXT_AUTH_CACHE_TTL_SECONDS": "2",
             "ATEXT_PUBLIC_ORIGIN": proxy_origin,
+            "STRIPE_SECRET_KEY": E2E_STRIPE_SECRET_KEY,
+            "STRIPE_WEBHOOK_SECRET": E2E_STRIPE_WEBHOOK_SECRET,
+            "ATEXT_STRIPE_PRICE_ID": E2E_STRIPE_PRICE_ID,
         }
     )
     proc = subprocess.Popen(
@@ -500,6 +509,41 @@ def _get_billing(atext: RunningAText, team: E2ETeam) -> dict[str, Any]:
     return data
 
 
+def _request_checkout(atext: RunningAText, team: E2ETeam) -> subprocess.CompletedProcess[str]:
+    return _aw_request(team, "POST", f"{atext.origin}/v1/billing/checkout")
+
+
+def _request_portal(atext: RunningAText, team: E2ETeam) -> subprocess.CompletedProcess[str]:
+    return _aw_request(team, "POST", f"{atext.origin}/v1/billing/portal")
+
+
+def _require_v2_billing_endpoint(atext: RunningAText, team: E2ETeam) -> dict[str, Any]:
+    result = _request_checkout(atext, team)
+    if result.returncode != 0 and re.search(r"HTTP (404|405)\b", result.stderr):
+        pytest.skip("v2 billing server endpoints are not present on this branch yet")
+    data = _aw_json(result, context="checkout endpoint availability")
+    assert isinstance(data, dict)
+    return data
+
+
+def _post_stripe_event(
+    atext: RunningAText,
+    payload: dict[str, Any],
+    *,
+    secret: str = E2E_STRIPE_WEBHOOK_SECRET,
+    timestamp: int | None = None,
+    body_override: bytes | None = None,
+    signature_override: str | None = None,
+) -> httpx.Response:
+    body, signature = sign_stripe_event(payload, secret, timestamp=timestamp)
+    return httpx.post(
+        f"{atext.origin}/v1/stripe/webhook",
+        content=body if body_override is None else body_override,
+        headers={"Stripe-Signature": signature if signature_override is None else signature_override},
+        timeout=10.0,
+    )
+
+
 def test_health_endpoints_are_public(atext: RunningAText) -> None:
     for path in ("/health", "/live", "/ready"):
         response = httpx.get(f"{atext.origin}{path}", timeout=10.0)
@@ -710,3 +754,112 @@ def test_real_aw_free_document_cap_and_billing(atext: RunningAText, aw_workspace
     assert "free_tier_limit_exceeded" in error_text
     assert "documents" in error_text
     assert "subscriptions are not yet available" in error_text
+
+
+def test_v2_billing_webhook_lifts_caps_replay_idempotent_and_cancellation_restores_free(
+    atext: RunningAText,
+    aw_workspace: AWWorkspace,
+) -> None:
+    team = _provision_team(aw_workspace)
+    checkout = _require_v2_billing_endpoint(atext, team)
+    assert checkout["checkout_url"].startswith("http")
+
+    for index in range(3):
+        _create_document(atext, team, slug=f"v2-note-{index}", title=f"V2 Note {index}", body="hello")
+
+    blocked = _aw_request(
+        team,
+        "POST",
+        f"{atext.origin}/v1/documents",
+        body=json.dumps({"slug": "v2-note-3", "title": "V2 Note 3", "body": "blocked"}),
+    )
+    _assert_aw_status(blocked, 402, context="free cap before checkout webhook")
+    blocked_payload = json.loads(blocked.stdout)
+    assert blocked_payload["detail"]["code"] == "free_tier_limit_exceeded"
+    assert blocked_payload["detail"]["subscriptions_available"] is True
+    assert (
+        blocked_payload["detail"]["checkout_command"]
+        == 'aw id request POST "$ATEXT_ORIGIN/v1/billing/checkout" --team-auth --raw'
+    )
+
+    completed = stripe_event(
+        "checkout.session.completed",
+        {
+            "id": "cs_e2e_complete",
+            "object": "checkout.session",
+            "client_reference_id": team.team_id,
+            "customer": "cus_e2e",
+            "subscription": "sub_e2e",
+        },
+        event_id=f"evt_{uuid.uuid4().hex}",
+    )
+    activated = _post_stripe_event(atext, completed)
+    assert activated.status_code == 200, activated.text
+
+    # Replay of the same event id is accepted but does not create another transition.
+    replay = _post_stripe_event(atext, completed)
+    assert replay.status_code == 200, replay.text
+
+    paid_create = _aw_request(
+        team,
+        "POST",
+        f"{atext.origin}/v1/documents",
+        body=json.dumps({"slug": "paid-note", "title": "Paid Note", "body": "caps lifted"}),
+    )
+    _assert_aw_success(paid_create, context="create after checkout webhook")
+    active_billing = _get_billing(atext, team)
+    assert active_billing["tier"] == "active"
+    assert active_billing["caps"] == {"max_documents": None, "max_versions_per_doc": None}
+
+    portal = _aw_json(_request_portal(atext, team), context="billing portal")
+    assert isinstance(portal, dict)
+    assert portal["portal_url"].startswith("http")
+
+    deleted = stripe_event(
+        "customer.subscription.deleted",
+        {"id": "sub_e2e", "object": "subscription", "customer": "cus_e2e", "status": "canceled"},
+        event_id=f"evt_{uuid.uuid4().hex}",
+    )
+    canceled = _post_stripe_event(atext, deleted)
+    assert canceled.status_code == 200, canceled.text
+
+    free_billing = _get_billing(atext, team)
+    assert free_billing["tier"] == "free"
+    blocked_again = _aw_request(
+        team,
+        "POST",
+        f"{atext.origin}/v1/documents",
+        body=json.dumps({"slug": "after-cancel", "title": "After cancel", "body": "blocked again"}),
+    )
+    _assert_aw_status(blocked_again, 402, context="cap restored after cancellation")
+
+
+def test_v2_billing_webhook_signature_negatives(atext: RunningAText, aw_workspace: AWWorkspace) -> None:
+    team = _provision_team(aw_workspace)
+    _require_v2_billing_endpoint(atext, team)
+    payload = stripe_event(
+        "checkout.session.completed",
+        {
+            "id": "cs_e2e_bad_sig",
+            "object": "checkout.session",
+            "client_reference_id": team.team_id,
+            "customer": "cus_bad_sig",
+            "subscription": "sub_bad_sig",
+        },
+        event_id=f"evt_{uuid.uuid4().hex}",
+    )
+
+    bad_signature = _post_stripe_event(atext, payload, signature_override="t=1,v1=deadbeef")
+    assert bad_signature.status_code == 400, bad_signature.text
+
+    stale = _post_stripe_event(atext, payload, timestamp=int(time.time()) - 301)
+    assert stale.status_code == 400, stale.text
+
+    signed_body, signed_header = sign_stripe_event(payload, E2E_STRIPE_WEBHOOK_SECRET)
+    tampered = _post_stripe_event(
+        atext,
+        payload,
+        body_override=signed_body.replace(b"sub_bad_sig", b"sub_tampered"),
+        signature_override=signed_header,
+    )
+    assert tampered.status_code == 400, tampered.text

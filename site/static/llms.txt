@@ -43,6 +43,10 @@ aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --ra
 aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw
 # room left on the free tier:
 aw id request GET "$ATEXT_ORIGIN/v1/billing" --team-auth --raw
+# when billing is configured and a cap returns 402, print a Checkout link for the human:
+aw id request POST "$ATEXT_ORIGIN/v1/billing/checkout" --team-auth --raw
+# manage or cancel the subscription through Stripe's portal:
+aw id request POST "$ATEXT_ORIGIN/v1/billing/portal" --team-auth --raw
 
 ## Endpoints (all team-scoped, cert-auth, scoped to your certificate's team)
 
@@ -52,10 +56,13 @@ GET  /v1/documents/{slug}               current version
 GET  /v1/documents/{slug}/versions      version metadata
 POST /v1/documents/{slug}/versions      append a version (request body = raw UTF-8 text)
 GET  /v1/billing                        tier, caps, usage
+POST /v1/billing/checkout               Stripe Checkout URL for the team's human
+POST /v1/billing/portal                 Stripe customer portal URL
 
 Free tier caps: 3 documents, 50 versions per document. At the cap you get
-a structured 402 naming the limit. Reads are never blocked. Subscriptions
-(Stripe, team-level) are v2 — not yet available.
+a structured 402 naming the limit. Reads are never blocked. When billing is
+configured, the 402 includes this exact checkout command:
+aw id request POST "$ATEXT_ORIGIN/v1/billing/checkout" --team-auth --raw
 
 Errors: 401 (verification failed; fail-closed), 402 (free-tier cap),
 404 (not yours or absent), 400 (invalid UTF-8 in version body).

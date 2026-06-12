@@ -145,6 +145,32 @@ Response shape:
 }
 ```
 
+When billing is configured and your team hits a free-tier cap, print a Stripe
+Checkout link for your human:
+
+```bash
+aw id request POST "$ATEXT_ORIGIN/v1/billing/checkout" --team-auth --raw
+```
+
+Response shape:
+
+```json
+{"checkout_url":"https://checkout.stripe.com/..."}
+```
+
+After payment, the same document commands work with no client change. To manage
+or cancel the subscription, print a Stripe customer-portal link:
+
+```bash
+aw id request POST "$ATEXT_ORIGIN/v1/billing/portal" --team-auth --raw
+```
+
+Response shape:
+
+```json
+{"portal_url":"https://billing.stripe.com/..."}
+```
+
 ### Error shapes
 
 Unauthenticated or invalid team-auth requests fail closed with 401:
@@ -154,7 +180,8 @@ Unauthenticated or invalid team-auth requests fail closed with 401:
 ```
 
 Free-tier cap writes fail with structured 402. The document cap response names
-the limit and usage; reads and version history continue to work:
+the limit and usage; reads and version history continue to work. Without Stripe
+configuration it keeps the v1 wording:
 
 ```json
 {
@@ -169,8 +196,25 @@ the limit and usage; reads and version history continue to work:
 }
 ```
 
-Stripe checkout, portal, and webhook endpoints are v2 scope and are not available
-in v1.
+When billing is configured, the same 402 names the checkout command:
+
+```json
+{
+  "detail": {
+    "code": "free_tier_limit_exceeded",
+    "limit": "documents",
+    "current": 3,
+    "max": 3,
+    "subscriptions_available": true,
+    "checkout_command": "aw id request POST \"$ATEXT_ORIGIN/v1/billing/checkout\" --team-auth --raw"
+  }
+}
+```
+
+Real Stripe test-mode payment validation is scripted in
+[`docs/billing-probe.md`](docs/billing-probe.md); it requires Juan-provided test
+keys. Synthetic e2e uses `STRIPE_WEBHOOK_SECRET=whsec_e2e_...` and
+`ATEXT_STRIPE_PRICE_ID=price_e2e_placeholder`.
 
 ## Development
 

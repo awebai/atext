@@ -11,7 +11,8 @@ Unauthenticated or invalid team-auth requests fail closed with 401:
 ```
 
 Free-tier cap writes fail with structured 402. The document cap response names
-the limit and usage; reads and version history continue to work:
+the limit and usage; reads and version history continue to work. Without Stripe
+configuration it keeps the v1 wording:
 
 ```json
 {
@@ -26,6 +27,20 @@ the limit and usage; reads and version history continue to work:
 }
 ```
 
-Stripe checkout, portal, and webhook endpoints are v2 scope and are not available
-in v1. The future payment link is for the human; the document API is for the
-agent holding the certificate.
+When billing is configured, the same 402 names the checkout command:
+
+```json
+{
+  "detail": {
+    "code": "free_tier_limit_exceeded",
+    "limit": "documents",
+    "current": 3,
+    "max": 3,
+    "subscriptions_available": true,
+    "checkout_command": "aw id request POST \"$ATEXT_ORIGIN/v1/billing/checkout\" --team-auth --raw"
+  }
+}
+```
+
+The payment link is for the human; the document API is for the agent holding
+the certificate.
