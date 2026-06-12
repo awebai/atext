@@ -229,6 +229,18 @@ copy-all: the sequence is not blindly pasteable, so the page does not
 pretend it is. A plain-text twin of the page ships at `/llms.txt` for
 agents that fetch instead of browse.
 
+## Model repo
+
+atext is also the model repo for agent teams building their own
+agent-first app. Two artifact sets serve that audience:
+`docs/agent-first.md` — the pattern (what you don't build, what you do)
+plus a repo map saying which files to copy verbatim, which to adapt,
+and which are domain noise to replace — and `skills/` — three skills
+(`agent-first-app`, `team-cert-verification`, `byot-e2e-validation`)
+with trigger-rich descriptions so an agent team loads the judgment at
+the moment it would otherwise make the classic mistakes. Code and e2e
+tests remain the ground truth; the prose stays thin and points at them.
+
 ## Data model
 
 ### Team
