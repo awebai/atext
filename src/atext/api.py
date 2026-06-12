@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -17,7 +15,13 @@ from atext.models import (
     DocumentSummary,
     DocumentVersion,
 )
-from atext.repository import append_version, create_document, get_document, list_documents, list_versions
+from atext.repository import (
+    append_version,
+    create_document,
+    get_document,
+    list_documents,
+    list_versions,
+)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
