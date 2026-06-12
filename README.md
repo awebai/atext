@@ -44,4 +44,5 @@ Configuration is environment-driven:
 
 - `ATEXT_DATABASE_URL` — PostgreSQL connection string.
 - `ATEXT_AWID_REGISTRY_URL` — AWID registry URL, default `https://api.awid.ai`.
+- `ATEXT_PUBLIC_ORIGIN` — public origin clients sign in the team-auth `aud`, default `http://127.0.0.1:8765`.
 - `ATEXT_AUTH_CACHE_TTL_SECONDS` — AWID auth cache TTL, default `600`.
