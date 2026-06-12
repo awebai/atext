@@ -245,7 +245,8 @@ hard way:
    chain falls short (e.g. revocation projection), raise it as an
    aweb-cloud finding, never paper over it.
 4. **Billing e2e**: Stripe test mode; checkout → webhook → caps lift;
-   cancellation → caps return. CLI prints links a human can actually open.
+   cancellation → caps return. The checkout recipe prints a link a human
+   can actually open.
 5. **Customer-shaped probe before any public mention**: fresh directory,
    released `aw` only, the documented `aw id request` lines verbatim.
 
