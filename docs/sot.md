@@ -430,8 +430,12 @@ works around.
 
 ## Open questions (for Juan)
 
-1. **Pricing**: placeholder one tier, `$N/team/month`. Pick N when v2
-   billing is implemented.
+1. **Pricing**: one tier ("team"), placeholder `$20/team/month`
+   (coordinator's working value, 2026-06-12 — Juan revisits before
+   launch). Tests and e2e run with synthetic Stripe config
+   (`STRIPE_WEBHOOK_SECRET=whsec_e2e_…`, `ATEXT_STRIPE_PRICE_ID=
+   price_e2e_placeholder`); only the human-pays test-mode probe needs
+   real test keys.
 
 Decided: the hosted instance lives at `https://atext.ai` (Juan,
 2026-06-12).
