@@ -60,39 +60,70 @@ product authority; AWID remains the source of truth.
 
 ## Authentication envelope
 
-Every team-scoped endpoint requires team-certificate auth using the same
-shape as `aweb` coordination endpoints:
+Every team-scoped endpoint requires the **request-bound v2 team-auth
+envelope** — the same contract `aweb`/AC verify and `aw id request
+--team-auth` produces (CLI >= 1.26.17). This envelope binds the signature to
+the specific request so a captured signature cannot be replayed against a
+different endpoint, method, or host. `atext` is the canonical third-party
+relying party for it.
+
+Headers on every team-scoped request:
 
 ```http
 Authorization: DIDKey <did:key:z6Mk...> <base64url-no-padding-ed25519-signature>
 X-AWEB-Timestamp: <RFC3339 UTC timestamp>
 X-AWID-Team-Certificate: <base64-standard-json-team-certificate>
+X-AWEB-Signed-Payload: <base64url-no-padding canonical-JSON of the signed payload>
 ```
 
-The signed request payload is canonical JSON:
+The signed payload (the exact bytes carried, canonically encoded, in
+`X-AWEB-Signed-Payload`) is canonical JSON with these fields:
 
 ```json
-{"body_sha256":"<sha256 hex of request body>","team_id":"<team>:<namespace>","timestamp":"<RFC3339 UTC timestamp>"}
+{"aud":"https://<atext-host>","body_sha256":"<sha256 hex of request body>","method":"<UPPER>","path":"<path?query>","team_id":"<team>:<namespace>","timestamp":"<RFC3339 UTC timestamp>","v":2}
 ```
+
+The Ed25519 signature is computed over the raw bytes of the decoded
+`X-AWEB-Signed-Payload`, not over a payload the server reconstructs. The
+server then independently validates every claim against the actual request,
+so a valid signature is necessary but not sufficient.
 
 Verification steps:
 
-1. Parse the DIDKey auth header and timestamp.
-2. Reject timestamps outside the configured skew window (default 300s).
-3. Compute `body_sha256` from the exact request bytes.
-4. Verify the DIDKey signature over the canonical request payload.
-5. Decode the team certificate.
-6. Resolve the certificate's `team_id` to the team public key from AWID
-   (cached).
-7. Verify the certificate signature against the AWID-resolved team key, not
-   against the `team_did_key` field by itself.
-8. Check `certificate_id` against AWID revocation facts (cached).
-9. Require `certificate.member_did_key == request.did_key`.
+1. Require `X-AWEB-Signed-Payload`; decode it (base64url, no padding) and
+   require it to be **canonical** (`canonical_json(parsed) == decoded
+   bytes`) — reject otherwise.
+2. Require `v == 2`. Reject other/absent versions (`atext` does not accept
+   the legacy compact envelope; its only client speaks v2).
+3. Parse the DIDKey auth header and `X-AWEB-Timestamp`; reject timestamps
+   outside the skew window (default 300s); require the signed `timestamp`
+   to equal the header.
+4. Compute `body_sha256` from the exact request bytes; require the signed
+   `body_sha256` to match.
+5. Require the signed `method`, `path` (raw on-the-wire path + query), and
+   `team_id` to equal this request's, and the signed `aud` to canonicalize
+   to `atext`'s own configured public origin. Mismatch on any field fails
+   closed with 401 — this is the request-binding that prevents replay.
+6. Verify the DIDKey signature over the decoded `X-AWEB-Signed-Payload`
+   bytes.
+7. Decode the team certificate; require `certificate.member_did_key ==
+   request.did_key`.
+8. Resolve the certificate's `team_id` to the team public key from AWID
+   (cached); verify the certificate signature against the AWID-resolved team
+   key, never against the `team_did_key` field by itself.
+9. Check `certificate_id` against AWID revocation facts (cached).
 10. Build the request principal from the verified certificate.
 
 If AWID is unavailable and no unexpired cache entry exists, the request
 fails closed with 503/401. Never fall back to trusting a presented
-certificate without an AWID-resolved team key.
+certificate without an AWID-resolved team key. `atext`'s configured public
+origin must equal the host clients reach it at (the `aud` they sign); a
+misconfigured origin fails every v2 request closed rather than silently
+accepting.
+
+The reference verifier for this envelope is `aweb.team_auth_envelope`
+(server-side) — `atext/auth.py` implements the same contract independently
+so the relying-party path is self-contained and copyable.
 
 ## Subscription and billing
 
@@ -128,10 +159,11 @@ billing state. Over-cap teams keep read access and version history.
 atext ships **no client code**. The `aw` CLI every agent already has is the
 client: `aw id request` makes a DIDKey-signed HTTP request with the local
 identity key, and `--team-auth` attaches the active team certificate and
-signs the team-bound payload — exactly this service's envelope
-(`X-AWEB-Timestamp`, `X-AWID-Team-Certificate`, signed
-`{body_sha256, team_id, timestamp}`). Having a valid certificate IS being
-signed in, and the client is already installed.
+produces the request-bound v2 envelope above (`X-AWEB-Signed-Payload` over
+`{v:2, aud, method, path, team_id, body_sha256, timestamp}`). Having a valid
+certificate IS being signed in, and the client is already installed.
+Requires `aw >= 1.26.17`, which emits the `v:2` marker (verified live
+against the hosted gateway 2026-06-12; 1.26.16 omits it and fails closed).
 
 ```bash
 # create a document
@@ -231,9 +263,12 @@ request must not name another team in the body and bypass this scope.
 The point of the reference app is that the auth actually works, proven the
 hard way:
 
-1. **Unit/interop**: verify the envelope implementation against the aweb
-   repo's signing/certificate test vectors (`aweb/test-vectors/`) so atext
-   and aweb agree byte-for-byte on canonical JSON and signatures.
+1. **Unit/interop**: verify the v2 envelope implementation against
+   `aweb.team_auth_envelope` and the aweb repo's signing/certificate test
+   vectors (`aweb/test-vectors/`) so atext and aweb agree byte-for-byte on
+   canonical JSON, the request-binding fields, and signatures. Include the
+   replay negatives the live proof exercised: a signature minted for one
+   path/method/host must fail against another.
 2. **E2E, no mocks**: docker-compose with a local awid-service + postgres;
    create a real namespace, team, controller, member certs with `aw id`;
    exercise every endpoint with real signatures, including revocation
@@ -255,9 +290,12 @@ crypto/services are not acceptable in the e2e layer.
 
 ## Milestones
 
-- **M1 — verify + serve**: auth envelope + AWID cache + documents API
-  green against local awid e2e (the existing scaffold, finished and
-  proven). Exit: revocation and fail-closed tests pass.
+- **M1 — verify + serve**: upgrade the scaffold's verifier from the compact
+  envelope it ships today to the request-bound v2 contract (decode
+  `X-AWEB-Signed-Payload`, require `v:2` + canonical, bind
+  aud/method/path/team_id/body_sha256/timestamp), keep the AWID cache and
+  documents API, green against local awid e2e. Exit: revocation,
+  fail-closed, and path/method/aud-mismatch replay tests pass.
 - **M2 — client recipes**: every endpoint exercised via
   `aw id request --team-auth` from a real aw workspace; the exact lines
   land in the README. Exit: an aw-initialized workspace (hosted team
