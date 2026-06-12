@@ -65,6 +65,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return await authenticate_request(request, settings=resolved, team_cache=cache, db=database)
 
     @app.get("/health")
+    @app.get("/live")
+    @app.get("/ready")
     async def health() -> dict[str, str]:
         return {"status": "ok", "service": "atext"}
 
