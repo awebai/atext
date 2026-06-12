@@ -232,11 +232,7 @@ def _provision_real_team_certificate(workspace: Path, env: dict[str, str]) -> st
 
 def test_no_envelope_fails_closed(atext_origin: str) -> None:
     response = httpx.get(f"{atext_origin}/v1/documents", timeout=10.0)
-    if response.status_code != 401:
-        pytest.xfail(
-            "auth.py is still on the scaffold verifier; flip this to a hard 401 assertion "
-            f"with default-aaaa.1. status={response.status_code} body={response.text}"
-        )
+    assert response.status_code == 401, response.text
 
 
 def test_real_aw_team_auth_smoke(atext_origin: str, aw_workspace: tuple[Path, dict[str, str]]) -> None:
@@ -253,11 +249,10 @@ def test_real_aw_team_auth_smoke(atext_origin: str, aw_workspace: tuple[Path, di
         check=False,
     )
 
-    if result.returncode != 0:
-        pytest.xfail(
-            "aw id request --team-auth emitted v2, but auth.py still verifies the legacy compact envelope; "
-            "flip this to a hard assertion when default-aaaa.1 lands. "
-            f"team_id={team_id}; stderr={result.stderr.strip()}"
-        )
-
+    assert result.returncode == 0, (
+        "aw id request --team-auth failed\n"
+        f"team_id={team_id}\n"
+        f"stdout:\n{result.stdout}\n"
+        f"stderr:\n{result.stderr}\n"
+    )
     assert result.stdout.strip() == "[]"

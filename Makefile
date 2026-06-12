@@ -5,8 +5,8 @@ test:
 
 e2e:
 	set -e; \
-	docker compose -p atext-e2e -f docker-compose.e2e.yml up --build --wait -d; \
 	trap 'docker compose -p atext-e2e -f docker-compose.e2e.yml down -v --remove-orphans' EXIT; \
+	docker compose -p atext-e2e -f docker-compose.e2e.yml up --build --wait -d; \
 	ATEXT_E2E=1 uv run pytest -q -m e2e
 
 e2e-up:
