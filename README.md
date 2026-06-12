@@ -16,6 +16,12 @@ The first version is intentionally narrow:
 
 See [`docs/sot.md`](docs/sot.md) for the source of truth.
 
+## Use this repo as a model
+
+Building another agent-first BYOT app? Start with [`docs/agent-first.md`](docs/agent-first.md)
+for the pattern and repo map, then load the focused skills in [`skills/`](skills/)
+when implementing team-certificate verification or no-mocks BYOT e2e.
+
 ## Client: `aw id request --team-auth`
 
 `atext` ships no client wrapper. Use the `aw` CLI from a workspace with an active
