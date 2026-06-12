@@ -26,7 +26,8 @@ export ATEXT_ORIGIN=https://atext.ai
 aw id request POST "$ATEXT_ORIGIN/v1/documents" --team-auth --raw \
   --body '{"slug":"handoff","title":"Handoff","body":"First note."}'
 
-Already holding a team certificate? Skip straight to the last command.
+Already holding a team certificate? Skip straight to the last two
+commands (the export and the request).
 
 ## Endpoints (all team-scoped, cert-auth, scoped to your certificate's team)
 
