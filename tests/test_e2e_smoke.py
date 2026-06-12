@@ -235,12 +235,19 @@ def test_no_envelope_fails_closed(atext_origin: str) -> None:
     assert response.status_code == 401, response.text
 
 
-def test_real_aw_team_auth_smoke(atext_origin: str, aw_workspace: tuple[Path, dict[str, str]]) -> None:
-    workspace, env = aw_workspace
-    team_id = _provision_real_team_certificate(workspace, env)
-
-    result = subprocess.run(
-        ["aw", "id", "request", "GET", f"{atext_origin}/v1/documents", "--team-auth", "--raw"],
+def _aw_id_request(
+    workspace: Path,
+    env: dict[str, str],
+    method: str,
+    url: str,
+    *,
+    body: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    cmd = ["aw", "id", "request", method, url, "--team-auth", "--raw"]
+    if body is not None:
+        cmd.extend(["--body", body])
+    return subprocess.run(
+        cmd,
         cwd=workspace,
         env=env,
         text=True,
@@ -249,10 +256,56 @@ def test_real_aw_team_auth_smoke(atext_origin: str, aw_workspace: tuple[Path, di
         check=False,
     )
 
+
+def _assert_aw_success(result: subprocess.CompletedProcess[str], *, team_id: str) -> None:
     assert result.returncode == 0, (
         "aw id request --team-auth failed\n"
         f"team_id={team_id}\n"
         f"stdout:\n{result.stdout}\n"
         f"stderr:\n{result.stderr}\n"
     )
+
+
+def test_real_aw_team_auth_smoke(atext_origin: str, aw_workspace: tuple[Path, dict[str, str]]) -> None:
+    workspace, env = aw_workspace
+    team_id = _provision_real_team_certificate(workspace, env)
+
+    result = _aw_id_request(workspace, env, "GET", f"{atext_origin}/v1/documents")
+
+    _assert_aw_success(result, team_id=team_id)
     assert result.stdout.strip() == "[]"
+
+
+def test_real_aw_free_document_cap_and_billing(atext_origin: str, aw_workspace: tuple[Path, dict[str, str]]) -> None:
+    workspace, env = aw_workspace
+    team_id = _provision_real_team_certificate(workspace, env)
+
+    for index in range(3):
+        result = _aw_id_request(
+            workspace,
+            env,
+            "POST",
+            f"{atext_origin}/v1/documents",
+            body=json.dumps({"slug": f"note-{index}", "title": f"Note {index}", "body": "hello"}),
+        )
+        _assert_aw_success(result, team_id=team_id)
+
+    billing = _aw_id_request(workspace, env, "GET", f"{atext_origin}/v1/billing")
+    _assert_aw_success(billing, team_id=team_id)
+    billing_payload = json.loads(billing.stdout)
+    assert billing_payload["tier"] == "free"
+    assert billing_payload["caps"]["max_documents"] == 3
+    assert billing_payload["usage"]["documents"] == 3
+
+    blocked = _aw_id_request(
+        workspace,
+        env,
+        "POST",
+        f"{atext_origin}/v1/documents",
+        body=json.dumps({"slug": "note-3", "title": "Note 3", "body": "blocked"}),
+    )
+    assert blocked.returncode != 0
+    error_text = blocked.stdout + blocked.stderr
+    assert "free_tier_limit_exceeded" in error_text
+    assert "documents" in error_text
+    assert "subscriptions are not yet available" in error_text

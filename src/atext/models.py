@@ -46,3 +46,20 @@ class DocumentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     latest: DocumentVersion
+
+
+class BillingCaps(BaseModel):
+    max_documents: int | None
+    max_versions_per_doc: int | None
+
+
+class BillingUsage(BaseModel):
+    documents: int
+    max_versions_per_doc: int
+
+
+class BillingResponse(BaseModel):
+    team_id: str
+    tier: str
+    caps: BillingCaps
+    usage: BillingUsage
