@@ -63,3 +63,14 @@ class BillingResponse(BaseModel):
     tier: str
     caps: BillingCaps
     usage: BillingUsage
+    stripe_customer_id: str | None = None
+    stripe_subscription_id: str | None = None
+    current_period_end: datetime | None = None
+
+
+class BillingCheckoutResponse(BaseModel):
+    checkout_url: str
+
+
+class BillingPortalResponse(BaseModel):
+    portal_url: str
