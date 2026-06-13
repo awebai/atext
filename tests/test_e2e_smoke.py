@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import socket
 import subprocess
 import sys
@@ -519,8 +518,6 @@ def _request_portal(atext: RunningAText, team: E2ETeam) -> subprocess.CompletedP
 
 def _require_v2_billing_endpoint(atext: RunningAText, team: E2ETeam) -> dict[str, Any]:
     result = _request_checkout(atext, team)
-    if result.returncode != 0 and re.search(r"HTTP (404|405)\b", result.stderr):
-        pytest.skip("v2 billing server endpoints are not present on this branch yet")
     data = _aw_json(result, context="checkout endpoint availability")
     assert isinstance(data, dict)
     return data
@@ -749,11 +746,15 @@ def test_real_aw_free_document_cap_and_billing(atext: RunningAText, aw_workspace
         f"{atext.origin}/v1/documents",
         body=json.dumps({"slug": "note-3", "title": "Note 3", "body": "blocked"}),
     )
-    assert blocked.returncode != 0
-    error_text = blocked.stdout + blocked.stderr
-    assert "free_tier_limit_exceeded" in error_text
-    assert "documents" in error_text
-    assert "subscriptions are not yet available" in error_text
+    _assert_aw_status(blocked, 402, context="free document cap")
+    blocked_payload = json.loads(blocked.stdout)
+    assert blocked_payload["detail"]["code"] == "free_tier_limit_exceeded"
+    assert blocked_payload["detail"]["limit"] == "documents"
+    assert blocked_payload["detail"]["subscriptions_available"] is True
+    assert (
+        blocked_payload["detail"]["checkout_command"]
+        == 'aw id request POST "$ATEXT_ORIGIN/v1/billing/checkout" --team-auth --raw'
+    )
 
 
 def test_v2_billing_webhook_lifts_caps_replay_idempotent_and_cancellation_restores_free(
