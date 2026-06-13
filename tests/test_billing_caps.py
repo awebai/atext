@@ -62,6 +62,13 @@ class FakeDB:
         compact = " ".join(sql.split())
         if "SELECT tier FROM" in compact:
             return {"tier": self.tier}
+        if "SELECT tier, stripe_customer_id, stripe_subscription_id, current_period_end" in compact:
+            return {
+                "tier": self.tier,
+                "stripe_customer_id": None,
+                "stripe_subscription_id": None,
+                "current_period_end": None,
+            }
         if "SELECT COUNT(*) AS n FROM {{tables.documents}} WHERE team_id" in compact:
             return {"n": self.document_count}
         if "COALESCE(MAX(version_count), 0)" in compact:
@@ -156,6 +163,9 @@ async def test_get_billing_returns_tier_caps_and_usage(principal: Principal) -> 
         "tier": "free",
         "caps": {"max_documents": 3, "max_versions_per_doc": 50},
         "usage": {"documents": 2, "max_versions_per_doc": 7},
+        "stripe_customer_id": None,
+        "stripe_subscription_id": None,
+        "current_period_end": None,
     }
 
 
@@ -200,6 +210,32 @@ async def test_create_document_at_free_cap_returns_structured_402(principal: Pri
         "message": "Free tier limit reached; subscriptions are not yet available.",
     }
     assert not any("INSERT INTO {{tables.documents}}" in sql for sql, _args in db.executed)
+
+
+@pytest.mark.asyncio
+async def test_cap_402_names_checkout_command_when_billing_configured(principal: Principal) -> None:
+    db = FakeDB(tier="free", document_count=3)
+    configured = Settings(
+        free_max_documents=3,
+        free_max_versions_per_doc=50,
+        public_origin="https://atext.example",
+        stripe_secret_key="sk_test_synthetic",
+        stripe_price_id="price_e2e_placeholder",
+    )
+
+    with pytest.raises(HTTPException) as raised:
+        await create_document(
+            cast(Any, db),
+            principal=principal,
+            settings=configured,
+            slug="note",
+            title="Note",
+            body="hello",
+        )
+
+    detail = cast(dict[str, Any], raised.value.detail)
+    assert detail["subscriptions_available"] is True
+    assert detail["checkout_command"] == 'aw id request POST "$ATEXT_ORIGIN/v1/billing/checkout" --team-auth --raw'
 
 
 @pytest.mark.asyncio

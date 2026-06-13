@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 from fastapi import HTTPException
 from pgdbm import AsyncDatabaseManager
 
+from atext import billing
 from atext.auth import Principal
 from atext.config import Settings
 
@@ -20,18 +21,24 @@ def _caps_for_tier(*, tier: str, settings: Settings) -> dict[str, int | None]:
     }
 
 
-def _limit_exceeded(*, limit: str, current: int, maximum: int) -> HTTPException:
-    return HTTPException(
-        status_code=402,
-        detail={
-            "code": "free_tier_limit_exceeded",
-            "limit": limit,
-            "current": current,
-            "max": maximum,
-            "subscriptions_available": False,
-            "message": "Free tier limit reached; subscriptions are not yet available.",
-        },
-    )
+def _limit_exceeded(*, limit: str, current: int, maximum: int, settings: Settings) -> HTTPException:
+    detail = {
+        "code": "free_tier_limit_exceeded",
+        "limit": limit,
+        "current": current,
+        "max": maximum,
+        "subscriptions_available": False,
+        "message": "Free tier limit reached; subscriptions are not yet available.",
+    }
+    if billing.checkout_configured(settings):
+        detail.update(
+            {
+                "subscriptions_available": True,
+                "checkout_command": billing.checkout_recipe(settings),
+                "message": "Free tier limit reached; run the checkout command to upgrade.",
+            }
+        )
+    return HTTPException(status_code=402, detail=detail)
 
 
 async def ensure_subscription(db: AsyncDatabaseManager, *, team_id: str) -> str:
@@ -82,12 +89,24 @@ async def get_billing_status(
     principal: Principal,
     settings: Settings,
 ) -> dict:
-    tier = await ensure_subscription(db, team_id=principal.team_id)
+    await ensure_subscription(db, team_id=principal.team_id)
+    row = await db.fetch_one(
+        """
+        SELECT tier, stripe_customer_id, stripe_subscription_id, current_period_end
+        FROM {{tables.subscriptions}}
+        WHERE team_id = $1
+        """,
+        principal.team_id,
+    )
+    tier = str(row["tier"] if row is not None else "free")
     return {
         "team_id": principal.team_id,
         "tier": tier,
         "caps": _caps_for_tier(tier=tier, settings=settings),
         "usage": await _team_usage(db, team_id=principal.team_id),
+        "stripe_customer_id": row["stripe_customer_id"] if row is not None else None,
+        "stripe_subscription_id": row["stripe_subscription_id"] if row is not None else None,
+        "current_period_end": row["current_period_end"] if row is not None else None,
     }
 
 
@@ -110,6 +129,7 @@ async def _enforce_document_cap(
             limit="documents",
             current=current,
             maximum=settings.free_max_documents,
+            settings=settings,
         )
 
 
@@ -133,6 +153,7 @@ async def _enforce_version_cap(
             limit="versions_per_doc",
             current=current,
             maximum=settings.free_max_versions_per_doc,
+            settings=settings,
         )
 
 
