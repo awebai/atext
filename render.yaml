@@ -20,7 +20,3 @@ services:
         value: "5"
       - key: ATEXT_DB_STATEMENT_CACHE_SIZE
         value: "0"
-      - key: ATEXT_FREE_MAX_DOCUMENTS
-        value: "3"
-      - key: ATEXT_FREE_MAX_VERSIONS_PER_DOC
-        value: "50"
