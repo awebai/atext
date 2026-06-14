@@ -19,6 +19,8 @@ dependencies = [
   "awid-service",
   "fastapi>=0.116.1",
   "httpx>=0.28.1",
+  "markdown>=3.8.2",
+  "nh3>=0.3.2",
   "pgdbm>=0.4.1",
   "pydantic>=2.11.7",
   "pydantic-settings>=2.10.1",

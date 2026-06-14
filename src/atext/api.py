@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from pgdbm import AsyncDatabaseManager
 
 from atext.auth import AWIDTeamCache, Principal, authenticate_request
@@ -11,17 +12,23 @@ from atext.db import ATextDatabase
 from atext.models import (
     BillingResponse,
     CreateDocumentRequest,
+    CreatePresentationRequest,
     DocumentResponse,
     DocumentSummary,
     DocumentVersion,
+    PresentationResponse,
 )
+from atext.presentation import render_presented_page
 from atext.repository import (
     append_version,
     create_document,
     get_billing_status,
     get_document,
+    get_presented_document,
     list_documents,
     list_versions,
+    mint_presentation_link,
+    revoke_presentation_link,
 )
 
 
@@ -128,6 +135,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         database: Annotated[AsyncDatabaseManager, Depends(db)],
     ) -> list[dict]:
         return await list_versions(database, principal=actor, slug=slug)
+
+    @app.post("/v1/present", response_model=PresentationResponse)
+    async def create_presentation_route(
+        request: Request,
+        actor: Annotated[Principal, Depends(principal)],
+        database: Annotated[AsyncDatabaseManager, Depends(db)],
+    ) -> dict:
+        payload = CreatePresentationRequest.model_validate(await request.json())
+        return await mint_presentation_link(
+            database,
+            principal=actor,
+            settings=resolved,
+            slug=payload.slug,
+            version=payload.version,
+            ttl_seconds=payload.ttl_seconds,
+        )
+
+    @app.post("/v1/present/{token}/revoke")
+    async def revoke_presentation_route(
+        token: str,
+        actor: Annotated[Principal, Depends(principal)],
+        database: Annotated[AsyncDatabaseManager, Depends(db)],
+    ) -> dict[str, bool]:
+        await revoke_presentation_link(database, principal=actor, token=token)
+        return {"revoked": True}
+
+    @app.get("/present/{token}", response_class=HTMLResponse)
+    async def present_route(
+        token: str,
+        database: Annotated[AsyncDatabaseManager, Depends(db)],
+    ) -> HTMLResponse:
+        presented = await get_presented_document(database, token=token)
+        return HTMLResponse(render_presented_page(body=str(presented["body"])))
 
     return app
 

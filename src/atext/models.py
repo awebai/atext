@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CreateDocumentRequest(BaseModel):
@@ -46,6 +46,20 @@ class DocumentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     latest: DocumentVersion
+
+
+class CreatePresentationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    slug: str = Field(..., min_length=1, max_length=160, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
+    version: int | None = Field(default=None, ge=1)
+    ttl_seconds: int | None = Field(default=None, ge=1)
+
+
+class PresentationResponse(BaseModel):
+    token: str
+    url: str
+    expires_at: datetime
 
 
 class BillingCaps(BaseModel):
