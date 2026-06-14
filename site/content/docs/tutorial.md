@@ -8,107 +8,109 @@ eyebrow: "No signup button"
 AWID team certificate (`aw >= 1.26.17`) and point it at the running service:
 
 ```bash
+export ATEXT_ORIGIN=https://api.atext.ai
+```
+
+For local development:
+
+```bash
 export ATEXT_ORIGIN=http://127.0.0.1:8765
 ```
 
-Create a document. Document creation is JSON because it carries the slug and title:
+## Create and edit documents
+
+Create a document. Document creation is JSON because it carries the slug and
+title:
 
 ```bash
+cat > handoff-create.json <<'JSON'
+{"slug":"handoff","title":"Handoff","body":"Initial handoff text."}
+JSON
 aw id request POST "$ATEXT_ORIGIN/v1/documents" --team-auth --raw \
-  --body '{"slug":"handoff","title":"Handoff","body":"Initial handoff text."}'
+  --body-file handoff-create.json
 ```
-
-Response shape:
-
-```json
-{
-  "document_id": "<uuid>",
-  "slug": "handoff",
-  "title": "Handoff",
-  "body": "Initial handoff text.",
-  "current_version": 1,
-  "created_at": "<timestamp>",
-  "updated_at": "<timestamp>",
-  "latest": {
-    "version_id": "<uuid>",
-    "version_number": 1,
-    "body": "Initial handoff text.",
-    "created_by_did_key": "did:key:...",
-    "created_by_did_aw": "did:aw:...",
-    "created_by_address": "example.com/alice",
-    "created_by_alias": "alice",
-    "certificate_id": "<certificate-id>",
-    "created_at": "<timestamp>"
-  }
-}
-```
-
-List the team's documents:
-
-```bash
-aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw
-```
-
-Response shape:
-
-```json
-[
-  {
-    "document_id": "<uuid>",
-    "slug": "handoff",
-    "title": "Handoff",
-    "current_version": 1,
-    "updated_at": "<timestamp>",
-    "created_at": "<timestamp>"
-  }
-]
-```
-
-Read the current version:
-
-```bash
-aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff" --team-auth --raw
-```
-
-Response shape is the same as create-document, with `body` and `latest` set to
-the newest version.
 
 Append a version. Appends are raw UTF-8 request bodies, not JSON:
 
 ```bash
-printf 'Second handoff version.\n' > handoff-v2.txt
+printf 'Second handoff version.\n' > handoff-v2.md
 aw id request POST "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --raw \
-  --body-file handoff-v2.txt
+  --body-file handoff-v2.md
 ```
 
-Response shape is the same as create-document, with `current_version` incremented
-and `body`/`latest.body` equal to the raw file contents.
-
-List version metadata:
+List version metadata and team documents:
 
 ```bash
 aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --raw
+aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw
 ```
 
-Response shape:
+## Present a document
 
-```json
-[
-  {
-    "version_id": "<uuid>",
-    "version_number": 2,
-    "body": null,
-    "created_by_did_key": "did:key:...",
-    "created_by_did_aw": "did:aw:...",
-    "created_by_address": "example.com/alice",
-    "created_by_alias": "alice",
-    "certificate_id": "<certificate-id>",
-    "created_at": "<timestamp>"
-  }
-]
+Mint a no-login capability link for a pinned document version:
+
+```bash
+cat > present.json <<'JSON'
+{"slug":"handoff","version":2,"ttl_seconds":86400}
+JSON
+aw id request POST "$ATEXT_ORIGIN/v1/present" --team-auth --raw \
+  --body-file present.json \
+  | tee present-response.json
 ```
 
-Read billing status:
+Open the returned `url` for the human and print it as fallback:
+
+```bash
+PRESENT_URL=$(jq -r '.url' present-response.json)
+if command -v open >/dev/null 2>&1; then open "$PRESENT_URL" || true;
+elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$PRESENT_URL" || true;
+fi
+printf 'Presented view: %s\n' "$PRESENT_URL"
+```
+
+Revoke when the link should stop working:
+
+```bash
+TOKEN=$(jq -r '.token' present-response.json)
+aw id request POST "$ATEXT_ORIGIN/v1/present/$TOKEN/revoke" --team-auth --raw
+```
+
+Public `GET /present/{token}` is unauthenticated server-rendered HTML. Unknown,
+expired, or revoked tokens return 404 and reveal no team/document metadata.
+
+## Set a team theme
+
+The present page uses a clean default until your team sets a theme.
+
+```bash
+aw id request GET "$ATEXT_ORIGIN/v1/theme" --team-auth --raw
+```
+
+Set colors, fonts, header/footer, and optionally a base64 logo. Logos must be
+real raster bytes with content type `image/png`, `image/jpeg`, `image/gif`, or
+`image/webp`.
+
+```bash
+python3 - <<'PY'
+import base64, json
+from pathlib import Path
+payload = {
+  "tokens": {
+    "colors": {"background":"#fffaf0","surface":"#ffffff","text":"#17201a","accent":"#246b49"},
+    "fonts": {"body":"system","heading":"serif"}
+  },
+  "header": "Presented by the Example team",
+  "footer": "Shared by capability link"
+}
+logo = Path("logo.png")
+if logo.exists():
+    payload["logo"] = {"content_type":"image/png", "data_base64": base64.b64encode(logo.read_bytes()).decode("ascii")}
+Path("theme.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+aw id request PUT "$ATEXT_ORIGIN/v1/theme" --team-auth --raw --body-file theme.json
+```
+
+## Check billing status
 
 ```bash
 aw id request GET "$ATEXT_ORIGIN/v1/billing" --team-auth --raw
@@ -125,6 +127,5 @@ Response shape:
 }
 ```
 
-The human has not been paged. The agent did the reading, writing, and billing
-status check. When v2 billing exists, the human appears once to pay; in v1 that
-button is intentionally absent.
+Cap writes return structured 402; reads and version history continue. Stripe
+checkout, portal, and webhooks are v2 scope.

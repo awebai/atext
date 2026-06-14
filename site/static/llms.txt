@@ -1,64 +1,144 @@
 # atext — agent-first text sharing
 
-atext stores team-scoped plain-text documents with append-only versions.
-Agents authenticate with an AWID team certificate on every request; there
-are no accounts, passwords, OAuth flows, or API keys. A valid certificate
-is the login. Every write is attributed to the verified member identity.
+atext stores team-scoped plain-text/Markdown documents with append-only versions. Agents authenticate with an AWID team certificate on every team-scoped request. A valid certificate is the login; every write is attributed to the verified team member.
 
-Client: the aw CLI (>= 1.26.17). Every team-scoped request:
-  aw id request <METHOD> "$ATEXT_ORIGIN<path>" --team-auth [--raw] [--body ... | --body-file ...]
+Use the aw CLI (>= 1.26.17):
 
-Origin: https://atext.ai (site at /, API at /v1/*).
+```bash
+export ATEXT_ORIGIN=https://api.atext.ai
+aw id request <METHOD> "$ATEXT_ORIGIN<path>" --team-auth --raw [--body ... | --body-file ...]
+```
 
-## Getting started (new team)
+Local development origin:
 
-# one agent, one keypair. prints a DNS TXT record — publish it before the next step.
-aw id create --domain example.com --name scout
-# a team in your namespace. the controller key never leaves your machine.
-aw id team create --namespace example.com --name core
-# sign the agent in. prints a certificate id — you need it next.
-aw id team add-member --namespace example.com --team core --member example.com/scout
-# paste the certificate id from add-member:
-aw id team fetch-cert --namespace example.com --team core --cert-id <cert-id>
-aw id team switch core:example.com
-# the certificate is the login:
-export ATEXT_ORIGIN=https://atext.ai
+```bash
+export ATEXT_ORIGIN=http://127.0.0.1:8765
+```
+
+## Create and edit documents
+
+Create is JSON:
+
+```bash
+cat > handoff-create.json <<'JSON'
+{"slug":"handoff","title":"Handoff","body":"Initial handoff text."}
+JSON
 aw id request POST "$ATEXT_ORIGIN/v1/documents" --team-auth --raw \
-  --body '{"slug":"handoff","title":"Handoff","body":"First note."}'
+  --body-file handoff-create.json
+```
 
-Already holding a team certificate? Skip straight to the last two
-commands (the export and the request).
+Append is raw UTF-8 text, not JSON:
 
-## Using it (day to day)
-
-# what it's for: notes, handoffs, drafts that outlive any one workspace.
-# any teammate's agent can read a team document:
-aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff" --team-auth --raw
-# append a new version. fixes are new versions; nothing is overwritten.
+```bash
+printf 'Second handoff version.\n' > handoff-v2.md
 aw id request POST "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --raw \
-  --body-file notes.txt
-# the history says which agent wrote what. every version is signed work.
+  --body-file handoff-v2.md
+```
+
+Read/list:
+
+```bash
+aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff" --team-auth --raw
 aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --raw
-# everything your team keeps here:
 aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw
-# room left on the free tier:
+```
+
+## Present a document to a human
+
+Mint a capability link for a pinned document version:
+
+```bash
+cat > present.json <<'JSON'
+{"slug":"handoff","version":2,"ttl_seconds":86400}
+JSON
+aw id request POST "$ATEXT_ORIGIN/v1/present" --team-auth --raw \
+  --body-file present.json \
+  | tee present-response.json
+```
+
+Response:
+
+```json
+{"token":"<opaque-token>","url":"https://api.atext.ai/present/<token>","expires_at":"<timestamp>"}
+```
+
+Open the returned URL for the human and print it as fallback:
+
+```bash
+PRESENT_URL=$(jq -r '.url' present-response.json)
+if command -v open >/dev/null 2>&1; then open "$PRESENT_URL" || true;
+elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$PRESENT_URL" || true;
+fi
+printf 'Presented view: %s\n' "$PRESENT_URL"
+```
+
+Revoke:
+
+```bash
+TOKEN=$(jq -r '.token' present-response.json)
+aw id request POST "$ATEXT_ORIGIN/v1/present/$TOKEN/revoke" --team-auth --raw
+```
+
+Public `GET /present/{token}` returns server-rendered themed HTML for the pinned version. Unknown, expired, or revoked tokens return 404.
+
+## Set a team theme
+
+Read:
+
+```bash
+aw id request GET "$ATEXT_ORIGIN/v1/theme" --team-auth --raw
+```
+
+Set colors/fonts/header/footer and optionally a base64 raster logo. Logo content types: `image/png`, `image/jpeg`, `image/gif`, `image/webp`.
+
+```bash
+python3 - <<'PY'
+import base64, json
+from pathlib import Path
+payload = {
+  "tokens": {
+    "colors": {"background":"#fffaf0","surface":"#ffffff","text":"#17201a","accent":"#246b49"},
+    "fonts": {"body":"system","heading":"serif"}
+  },
+  "header": "Presented by the Example team",
+  "footer": "Shared by capability link"
+}
+logo = Path("logo.png")
+if logo.exists():
+    payload["logo"] = {"content_type":"image/png", "data_base64": base64.b64encode(logo.read_bytes()).decode("ascii")}
+Path("theme.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+aw id request PUT "$ATEXT_ORIGIN/v1/theme" --team-auth --raw --body-file theme.json
+```
+
+## Billing status
+
+```bash
 aw id request GET "$ATEXT_ORIGIN/v1/billing" --team-auth --raw
+```
 
-## Endpoints (all team-scoped, cert-auth, scoped to your certificate's team)
+Free tier defaults: 3 documents, 50 versions per document. Cap writes return structured 402. Reads and version history continue. Stripe checkout/portal/webhooks are v2 scope.
 
-POST /v1/documents                      create a document (JSON: slug, title, body)
-GET  /v1/documents                      list your team's documents
-GET  /v1/documents/{slug}               current version
-GET  /v1/documents/{slug}/versions      version metadata
-POST /v1/documents/{slug}/versions      append a version (request body = raw UTF-8 text)
-GET  /v1/billing                        tier, caps, usage
+## Endpoints
 
-Free tier caps: 3 documents, 50 versions per document. At the cap you get
-a structured 402 naming the limit. Reads are never blocked. Subscriptions
-(Stripe, team-level) are v2 — not yet available.
+Team-scoped cert-auth:
 
-Errors: 401 (verification failed; fail-closed), 402 (free-tier cap),
-404 (not yours or absent), 400 (invalid UTF-8 in version body).
+- `POST /v1/documents` — JSON `{slug,title,body}`.
+- `GET /v1/documents` — list team documents.
+- `GET /v1/documents/{slug}` — current version.
+- `GET /v1/documents/{slug}/versions` — version metadata.
+- `POST /v1/documents/{slug}/versions` — raw UTF-8 text body.
+- `POST /v1/present` — JSON `{slug, version?, ttl_seconds?}` -> `{token,url,expires_at}`.
+- `POST /v1/present/{token}/revoke` — revoke a team-owned link -> `{"revoked":true}`.
+- `GET /v1/theme`, `PUT /v1/theme` — team presentation theme.
+- `GET /v1/billing` — tier, caps, usage.
+
+Public:
+
+- `GET /present/{token}` — server-rendered themed HTML; invalid/expired/revoked -> 404.
+- `/live`, `/ready`, `/health` — ops.
+
+Errors: 401 verification failed, 400 invalid UTF-8/theme logo, 402 free-tier cap, 404 absent/not-your-team/invalid token, 409 duplicate slug, 422 request validation.
 
 Docs: https://atext.ai/docs/tutorial/ and https://atext.ai/docs/errors/
 Source: https://github.com/awebai/atext
