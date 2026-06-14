@@ -60,6 +60,22 @@ def test_render_presented_page_sanitizes_theme_tokens_and_header_footer() -> Non
     assert "<img class=\"brand-logo\" src=\"/assets/logo-id\"" in html
 
 
+def test_presented_page_default_palette_matches_brand() -> None:
+    html = render_presented_page(body="# Hi")
+    style = html.split("</style>", 1)[0]
+
+    assert "--bg: #fffaf0;" in style
+    assert "--accent: #246b49;" in style
+
+
+def test_presented_page_shows_atext_brand_lockup() -> None:
+    html = render_presented_page(body="# Hi")
+
+    assert 'class="brand-lockup"' in html
+    assert "Presented with" in html
+    assert '<span class="brand-name">atext</span>' in html
+
+
 def test_repo_has_single_initial_migration() -> None:
     migrations = sorted((Path(__file__).resolve().parents[1] / "src" / "atext" / "migrations").glob("*.sql"))
 

@@ -26,8 +26,9 @@ a { color: var(--accent); text-decoration-thickness: .08em; text-underline-offse
 .nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .brand { font-weight: 800; font-size: 1.2rem; text-decoration: none; color: var(--ink); }
 .nav-links { display: flex; flex-wrap: wrap; gap: 1rem; font-size: .95rem; }
-.hero, .page, .grid { max-width: 74rem; margin: 0 auto; padding: 3rem 1.25rem; }
-.hero { padding-top: 5rem; }
+.page, .grid { max-width: 74rem; margin: 0 auto; padding: 3rem 1.25rem; }
+.hero { max-width: 54rem; margin: 0 auto; padding: 4rem 1.25rem 1.5rem; }
+.hero .wordmark { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 800; letter-spacing: -.04em; }
 .hero h1, .page h1 { font-size: clamp(2.5rem, 7vw, 5.5rem); line-height: .95; letter-spacing: -.06em; margin: .25rem 0 1rem; }
 .page h1 { font-size: clamp(2rem, 5vw, 4rem); }
 .lede { max-width: 48rem; font-size: clamp(1.2rem, 2.4vw, 1.65rem); color: var(--muted); }
@@ -50,6 +51,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .card-list a { font-weight: 800; }
 .card-list span { color: var(--muted); }
 .page-title { max-width: 54rem; margin: 3rem auto 1.25rem; padding: 0 1.25rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1.05rem; font-weight: 600; letter-spacing: 0; line-height: 1.4; }
+.terminal-intro { max-width: 54rem; margin: 1.5rem auto .75rem; padding: 0 1.25rem; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .95rem; }
 .terminal { max-width: 54rem; margin: 0 auto; padding: 0 1.25rem 1.5rem; }
 .terminal-frame { background: var(--code); border: 1px solid #263b2d; border-radius: .8rem; overflow: hidden; box-shadow: 0 1.5rem 3rem -2rem rgba(18, 32, 22, .55); }
 .terminal-bar { display: flex; justify-content: space-between; align-items: center; padding: .55rem 1.1rem; border-bottom: 1px solid #263b2d; color: #7fae90; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .75rem; letter-spacing: .06em; }
@@ -57,7 +59,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .comment { display: block; color: #7fae90; margin-top: .9rem; }
 .comment:first-child { margin-top: 0; }
 .cmd-block { display: block; position: relative; padding-right: 4rem; }
-.cmd-line { display: block; color: #eff9ef; }
+.cmd-line { display: block; color: #eff9ef; padding-left: 1.4rem; text-indent: -1.4rem; }
 .copy { position: absolute; top: .1rem; right: 0; opacity: 0; background: transparent; border: 1px solid #3a5a44; color: #a9d3b6; border-radius: .35rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .68rem; padding: .08rem .45rem; cursor: pointer; transition: opacity .12s ease; }
 .cmd-block:hover .copy, .copy:focus-visible { opacity: 1; }
 .copy:focus-visible { outline: 2px solid #a9d3b6; outline-offset: 1px; }
@@ -68,4 +70,5 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 @media (max-width: 40rem) {
   .nav { align-items: flex-start; flex-direction: column; }
   .hero, .page, .grid { padding-block: 2rem; }
+  .terminal pre { white-space: pre-wrap; overflow-wrap: break-word; }
 }
