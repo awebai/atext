@@ -194,12 +194,12 @@ def render_presented_page(*, body: str, theme: dict[str, Any] | None = None) -> 
   <style>
     :root {{
       color-scheme: light;
-      --bg: #f8fafc;
+      --bg: #fffaf0;
       --surface: #ffffff;
-      --text: #111827;
-      --muted: #4b5563;
-      --border: #e5e7eb;
-      --accent: #2563eb;
+      --text: #17201a;
+      --muted: #5f685f;
+      --border: #ded6c4;
+      --accent: #246b49;
       --font-body: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       --font-heading: var(--font-body);{theme_css}    }}
     * {{ box-sizing: border-box; }}
@@ -222,10 +222,20 @@ def render_presented_page(*, body: str, theme: dict[str, Any] | None = None) -> 
       box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
       padding: clamp(24px, 5vw, 56px);
     }}
-    .eyebrow {{
+    .brand-lockup {{
+      display: flex;
+      align-items: center;
+      gap: 8px;
       color: var(--muted);
       font-size: 0.875rem;
       margin: 0 0 24px;
+    }}
+    .brand-mark {{ width: 18px; height: 18px; flex: none; }}
+    .brand-name {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
     }}
     .brand-logo {{
       display: block;
@@ -245,7 +255,7 @@ def render_presented_page(*, body: str, theme: dict[str, Any] | None = None) -> 
     .document-body h1, .document-body h2, .document-body h3 {{ font-family: var(--font-heading); line-height: 1.2; }}
     .document-body a {{ color: var(--accent); }}
     .document-body pre, .document-body code {{
-      background: #f3f4f6;
+      background: #f3efe3;
       border-radius: 8px;
     }}
     .document-body code {{ padding: 0.1rem 0.25rem; }}
@@ -263,7 +273,7 @@ def render_presented_page(*, body: str, theme: dict[str, Any] | None = None) -> 
 <body>
   <main class="page">
     <article class="surface">
-{logo_html}      <p class="eyebrow">Presented with atext</p>
+{logo_html}      <p class="brand-lockup"><svg class="brand-mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#246b49"/><path d="M8 11.5 12 16 8 20.5" fill="none" stroke="#fffaf0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><line x1="15.5" y1="21" x2="23.5" y2="21" stroke="#fffaf0" stroke-width="2.4" stroke-linecap="round"/></svg>Presented with <span class="brand-name">atext</span></p>
 {header_html}      <div class="document-body">
 {content}
       </div>
