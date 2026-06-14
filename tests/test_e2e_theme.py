@@ -64,7 +64,9 @@ def test_theme_wraps_present_page_and_body_team_cannot_cross_scope(
     no_theme = _mint_present(atext, team_a, slug="memo")
     no_theme_page = httpx.get(no_theme["url"], timeout=10.0)
     assert no_theme_page.status_code == 200, no_theme_page.text
-    assert "Presented with atext" in no_theme_page.text
+    assert 'class="brand-lockup"' in no_theme_page.text
+    assert "Presented with " in no_theme_page.text
+    assert '<span class="brand-name">atext</span>' in no_theme_page.text
     assert "theme-header" in no_theme_page.text
     assert "Brand header" not in no_theme_page.text
     assert "<img class=\"brand-logo\"" not in no_theme_page.text
