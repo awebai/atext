@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 from html import escape
+from typing import Any
 
 import markdown
 import nh3
@@ -37,6 +39,118 @@ _ALLOWED_ATTRIBUTES = {
     "td": {"align"},
 }
 _ALLOWED_PROTOCOLS = {"http", "https", "mailto"}
+_COLOR_VARIABLES = {
+    "background": "--bg",
+    "surface": "--surface",
+    "text": "--text",
+    "muted": "--muted",
+    "border": "--border",
+    "accent": "--accent",
+}
+_FONT_VARIABLES = {
+    "body": "--font-body",
+    "heading": "--font-heading",
+}
+_FONT_ALLOWLIST = {
+    "system": 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    "serif": 'Georgia, Cambria, "Times New Roman", Times, serif',
+    "mono": 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+}
+_NAMED_COLORS = {
+    "black",
+    "white",
+    "transparent",
+    "red",
+    "green",
+    "blue",
+    "navy",
+    "orange",
+    "purple",
+    "pink",
+    "yellow",
+    "gray",
+    "grey",
+}
+_HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
+_RGB_COLOR_RE = re.compile(r"^rgba?\(([^)]+)\)$", re.IGNORECASE)
+
+
+def _valid_rgb_color(value: str) -> bool:
+    match = _RGB_COLOR_RE.fullmatch(value.strip())
+    if not match:
+        return False
+    parts = [part.strip() for part in match.group(1).split(",")]
+    if len(parts) not in {3, 4}:
+        return False
+    try:
+        channels = [int(part) for part in parts[:3]]
+    except ValueError:
+        return False
+    if any(channel < 0 or channel > 255 for channel in channels):
+        return False
+    if len(parts) == 4:
+        try:
+            alpha = float(parts[3])
+        except ValueError:
+            return False
+        if alpha < 0 or alpha > 1:
+            return False
+    return True
+
+
+def _valid_color(value: str) -> bool:
+    candidate = value.strip()
+    return bool(
+        _HEX_COLOR_RE.fullmatch(candidate)
+        or _valid_rgb_color(candidate)
+        or candidate.lower() in _NAMED_COLORS
+    )
+
+
+def sanitize_theme_tokens(tokens: Any) -> dict[str, dict[str, str]]:
+    if not isinstance(tokens, dict):
+        return {}
+
+    sanitized: dict[str, dict[str, str]] = {}
+    colors = tokens.get("colors")
+    if isinstance(colors, dict):
+        safe_colors = {
+            str(key): value.strip()
+            for key, value in colors.items()
+            if key in _COLOR_VARIABLES and isinstance(value, str) and _valid_color(value)
+        }
+        if safe_colors:
+            sanitized["colors"] = safe_colors
+
+    fonts = tokens.get("fonts")
+    if isinstance(fonts, dict):
+        safe_fonts = {
+            str(key): value.lower().strip()
+            for key, value in fonts.items()
+            if key in _FONT_VARIABLES and isinstance(value, str) and value.lower().strip() in _FONT_ALLOWLIST
+        }
+        if safe_fonts:
+            sanitized["fonts"] = safe_fonts
+
+    return sanitized
+
+
+def _theme_css(tokens: dict[str, dict[str, str]] | None) -> str:
+    if not tokens:
+        return ""
+    declarations: list[str] = []
+    for key, value in tokens.get("colors", {}).items():
+        variable = _COLOR_VARIABLES.get(key)
+        if variable and _valid_color(value):
+            declarations.append(f"      {variable}: {value.strip()};")
+    for key, value in tokens.get("fonts", {}).items():
+        variable = _FONT_VARIABLES.get(key)
+        family = _FONT_ALLOWLIST.get(value.lower().strip())
+        if variable and family:
+            declarations.append(f"      {variable}: {family};")
+    if not declarations:
+        return ""
+    return "\n" + "\n".join(declarations) + "\n"
 
 
 def render_presented_markdown(body: str) -> str:
@@ -56,8 +170,20 @@ def render_presented_markdown(body: str) -> str:
     )
 
 
-def render_presented_page(*, body: str) -> str:
+def render_presented_page(*, body: str, theme: dict[str, Any] | None = None) -> str:
     content = render_presented_markdown(body)
+    safe_tokens = sanitize_theme_tokens((theme or {}).get("tokens"))
+    theme_css = _theme_css(safe_tokens)
+    logo_url = str((theme or {}).get("logo_url") or "")
+    header = str((theme or {}).get("header") or "")
+    footer = str((theme or {}).get("footer") or "")
+    logo_html = (
+        f'      <img class="brand-logo" src="{escape(logo_url, quote=True)}" alt="Team logo">\n'
+        if logo_url
+        else ""
+    )
+    header_html = f'      <header class="theme-header">{escape(header)}</header>\n' if header else ""
+    footer_html = f'      <footer class="theme-footer">{escape(footer)}</footer>\n' if footer else ""
     title = escape("Presented document")
     return f"""<!doctype html>
 <html lang="en">
@@ -74,13 +200,14 @@ def render_presented_page(*, body: str) -> str:
       --muted: #4b5563;
       --border: #e5e7eb;
       --accent: #2563eb;
-    }}
+      --font-body: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-heading: var(--font-body);{theme_css}    }}
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
       background: var(--bg);
       color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: var(--font-body);
       line-height: 1.6;
     }}
     .page {{
@@ -100,9 +227,22 @@ def render_presented_page(*, body: str) -> str:
       font-size: 0.875rem;
       margin: 0 0 24px;
     }}
+    .brand-logo {{
+      display: block;
+      max-height: 72px;
+      max-width: min(240px, 100%);
+      object-fit: contain;
+      margin: 0 0 24px;
+    }}
+    .theme-header, .theme-footer {{
+      color: var(--muted);
+      white-space: pre-wrap;
+    }}
+    .theme-header {{ margin: 0 0 28px; }}
+    .theme-footer {{ margin: 32px 0 0; }}
     .document-body :first-child {{ margin-top: 0; }}
     .document-body :last-child {{ margin-bottom: 0; }}
-    .document-body h1, .document-body h2, .document-body h3 {{ line-height: 1.2; }}
+    .document-body h1, .document-body h2, .document-body h3 {{ font-family: var(--font-heading); line-height: 1.2; }}
     .document-body a {{ color: var(--accent); }}
     .document-body pre, .document-body code {{
       background: #f3f4f6;
@@ -123,11 +263,11 @@ def render_presented_page(*, body: str) -> str:
 <body>
   <main class="page">
     <article class="surface">
-      <p class="eyebrow">Presented with atext</p>
-      <div class="document-body">
+{logo_html}      <p class="eyebrow">Presented with atext</p>
+{header_html}      <div class="document-body">
 {content}
       </div>
-    </article>
+{footer_html}    </article>
   </main>
 </body>
 </html>"""

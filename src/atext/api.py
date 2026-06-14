@@ -1,9 +1,10 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pgdbm import AsyncDatabaseManager
 
 from atext.auth import AWIDTeamCache, Principal, authenticate_request
@@ -17,6 +18,8 @@ from atext.models import (
     DocumentSummary,
     DocumentVersion,
     PresentationResponse,
+    ThemeRequest,
+    ThemeResponse,
 )
 from atext.presentation import render_presented_page
 from atext.repository import (
@@ -25,10 +28,13 @@ from atext.repository import (
     get_billing_status,
     get_document,
     get_presented_document,
+    get_public_asset,
+    get_theme,
     list_documents,
     list_versions,
     mint_presentation_link,
     revoke_presentation_link,
+    upsert_theme,
 )
 
 
@@ -161,13 +167,49 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await revoke_presentation_link(database, principal=actor, token=token)
         return {"revoked": True}
 
+    @app.get("/v1/theme", response_model=ThemeResponse)
+    async def get_theme_route(
+        actor: Annotated[Principal, Depends(principal)],
+        database: Annotated[AsyncDatabaseManager, Depends(db)],
+    ) -> dict:
+        return await get_theme(database, principal=actor, settings=resolved)
+
+    @app.put("/v1/theme", response_model=ThemeResponse)
+    async def put_theme_route(
+        request: Request,
+        actor: Annotated[Principal, Depends(principal)],
+        database: Annotated[AsyncDatabaseManager, Depends(db)],
+    ) -> dict:
+        payload = ThemeRequest.model_validate(await request.json())
+        return await upsert_theme(
+            database,
+            principal=actor,
+            settings=resolved,
+            tokens=payload.tokens,
+            logo=payload.logo,
+            clear_logo=payload.clear_logo,
+            header=payload.header,
+            footer=payload.footer,
+        )
+
+    @app.get("/assets/{asset_id}")
+    async def asset_route(
+        asset_id: UUID,
+        database: Annotated[AsyncDatabaseManager, Depends(db)],
+    ) -> Response:
+        asset = await get_public_asset(database, asset_id=asset_id)
+        return Response(content=asset["bytes"], media_type=str(asset["content_type"]))
+
     @app.get("/present/{token}", response_class=HTMLResponse)
     async def present_route(
         token: str,
         database: Annotated[AsyncDatabaseManager, Depends(db)],
     ) -> HTMLResponse:
         presented = await get_presented_document(database, token=token)
-        return HTMLResponse(render_presented_page(body=str(presented["body"])))
+        theme = presented.get("theme")
+        if isinstance(theme, dict) and theme.get("logo_asset_id") is not None:
+            theme["logo_url"] = f"{resolved.public_origin.rstrip('/')}/assets/{theme['logo_asset_id']}"
+        return HTMLResponse(render_presented_page(body=str(presented["body"]), theme=theme))
 
     return app
 

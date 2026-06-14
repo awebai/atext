@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -10,6 +13,7 @@ from pgdbm import AsyncDatabaseManager
 
 from atext.auth import Principal
 from atext.config import Settings
+from atext.presentation import sanitize_theme_tokens
 
 ACTIVE_TIER = "active"
 
@@ -404,14 +408,154 @@ async def revoke_presentation_link(
 async def get_presented_document(db: AsyncDatabaseManager, *, token: str) -> dict[str, Any]:
     row = await db.fetch_one(
         """
-        SELECT v.body, p.expires_at
+        SELECT v.body, p.expires_at, t.tokens, t.logo_asset_id, t.header, t.footer
         FROM {{tables.presentation_links}} p
         JOIN {{tables.document_versions}} v
           ON v.document_id = p.document_id AND v.version_number = p.version_number
+        JOIN {{tables.documents}} d ON d.document_id = p.document_id
+        LEFT JOIN {{tables.themes}} t ON t.team_id = d.team_id
         WHERE p.token = $1 AND p.revoked_at IS NULL AND p.expires_at > NOW()
         """,
         token,
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Presentation not found")
-    return {"body": row["body"], "expires_at": row["expires_at"]}
+    return {
+        "body": row["body"],
+        "expires_at": row["expires_at"],
+        "theme": _theme_from_row(row, public_origin=None),
+    }
+
+
+def _json_value(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+    return value
+
+
+def _theme_from_row(row: Any, *, public_origin: str | None) -> dict[str, Any] | None:
+    data = dict(row)
+    if "tokens" not in data:
+        return None
+    tokens = sanitize_theme_tokens(_json_value(data.get("tokens")) or {})
+    logo_asset_id = data.get("logo_asset_id")
+    logo_url = None
+    if logo_asset_id is not None and public_origin is not None:
+        logo_url = f"{public_origin.rstrip('/')}/assets/{logo_asset_id}"
+    if not tokens and logo_asset_id is None and data.get("header") is None and data.get("footer") is None:
+        return None
+    return {
+        "tokens": tokens,
+        "logo_asset_id": logo_asset_id,
+        "logo_url": logo_url,
+        "header": data.get("header"),
+        "footer": data.get("footer"),
+        "updated_at": data.get("updated_at"),
+    }
+
+
+def _asset_response(row: Any) -> dict[str, Any]:
+    data = dict(row)
+    return {"bytes": bytes(data["bytes"]), "content_type": data["content_type"]}
+
+
+def _decode_logo(logo: Any) -> tuple[bytes, str]:
+    content_type = str(logo.content_type).strip().lower()
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Logo content_type must be image/*")
+    try:
+        payload = base64.b64decode(str(logo.data_base64), validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Logo data_base64 must be valid base64") from exc
+    if not payload:
+        raise HTTPException(status_code=400, detail="Logo must not be empty")
+    if len(payload) > 256 * 1024:
+        raise HTTPException(status_code=400, detail="Logo must be <= 256 KiB")
+    return payload, content_type
+
+
+async def get_theme(
+    db: AsyncDatabaseManager,
+    *,
+    principal: Principal,
+    settings: Settings,
+) -> dict[str, Any]:
+    row = await db.fetch_one(
+        """
+        SELECT tokens, logo_asset_id, header, footer, updated_at
+        FROM {{tables.themes}}
+        WHERE team_id = $1
+        """,
+        principal.team_id,
+    )
+    if row is None:
+        return {"tokens": {}, "logo_asset_id": None, "logo_url": None, "header": None, "footer": None, "updated_at": None}
+    theme = _theme_from_row(row, public_origin=settings.public_origin)
+    if theme is None:
+        return {"tokens": {}, "logo_asset_id": None, "logo_url": None, "header": None, "footer": None, "updated_at": None}
+    return theme
+
+
+async def upsert_theme(
+    db: AsyncDatabaseManager,
+    *,
+    principal: Principal,
+    settings: Settings,
+    tokens: dict[str, dict[str, str]],
+    logo: Any | None,
+    clear_logo: bool,
+    header: str | None,
+    footer: str | None,
+) -> dict[str, Any]:
+    safe_tokens = sanitize_theme_tokens(tokens)
+    token_bytes = json.dumps(safe_tokens, separators=(",", ":"))
+    async with db.transaction() as tx:
+        current = await tx.fetch_one(
+            "SELECT logo_asset_id FROM {{tables.themes}} WHERE team_id = $1",
+            principal.team_id,
+        )
+        logo_asset_id = None if clear_logo else (current["logo_asset_id"] if current is not None else None)
+        if logo is not None:
+            logo_bytes, content_type = _decode_logo(logo)
+            logo_asset_id = uuid4()
+            await tx.execute(
+                """
+                INSERT INTO {{tables.assets}} (asset_id, team_id, bytes, content_type)
+                VALUES ($1, $2, $3, $4)
+                """,
+                logo_asset_id,
+                principal.team_id,
+                logo_bytes,
+                content_type,
+            )
+        await tx.execute(
+            """
+            INSERT INTO {{tables.themes}} (team_id, tokens, logo_asset_id, header, footer)
+            VALUES ($1, $2::jsonb, $3, $4, $5)
+            ON CONFLICT (team_id) DO UPDATE SET
+                tokens = EXCLUDED.tokens,
+                logo_asset_id = EXCLUDED.logo_asset_id,
+                header = EXCLUDED.header,
+                footer = EXCLUDED.footer,
+                updated_at = NOW()
+            """,
+            principal.team_id,
+            token_bytes,
+            logo_asset_id,
+            header,
+            footer,
+        )
+    return await get_theme(db, principal=principal, settings=settings)
+
+
+async def get_public_asset(db: AsyncDatabaseManager, *, asset_id: UUID) -> dict[str, Any]:
+    row = await db.fetch_one(
+        "SELECT bytes, content_type FROM {{tables.assets}} WHERE asset_id = $1",
+        asset_id,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return _asset_response(row)
