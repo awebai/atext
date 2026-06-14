@@ -6,18 +6,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=8765
 
-# git is required because awid-service is not vendored in this repo; install it
-# from the aweb repository's awid subdirectory at the commit used by this
-# workspace. pgdbm is installed from PyPI.
+# ca-certificates lets pip reach PyPI over HTTPS; every dependency is published.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git \
+    && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 RUN python -m pip install --upgrade pip \
     && python -m pip install \
-      "awid-service @ git+https://github.com/awebai/aweb.git@d0baafa389b600c8b0a12525797d6e38726c5252#subdirectory=awid" \
+      "awid-service==0.5.12" \
       "fastapi>=0.116.1" \
       "httpx>=0.28.1" \
       "markdown>=3.8.2" \
