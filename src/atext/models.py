@@ -62,6 +62,32 @@ class PresentationResponse(BaseModel):
     expires_at: datetime
 
 
+class ThemeLogoInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    content_type: str = Field(..., min_length=1, max_length=100)
+    data_base64: str = Field(..., min_length=1)
+
+
+class ThemeRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    tokens: dict[str, dict[str, str]] = Field(default_factory=dict)
+    logo: ThemeLogoInput | None = None
+    clear_logo: bool = False
+    header: str | None = Field(default=None, max_length=2_000)
+    footer: str | None = Field(default=None, max_length=2_000)
+
+
+class ThemeResponse(BaseModel):
+    tokens: dict[str, dict[str, str]]
+    logo_asset_id: UUID | None = None
+    logo_url: str | None = None
+    header: str | None = None
+    footer: str | None = None
+    updated_at: datetime | None = None
+
+
 class BillingCaps(BaseModel):
     max_documents: int | None
     max_versions_per_doc: int | None
