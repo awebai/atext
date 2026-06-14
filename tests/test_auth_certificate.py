@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import base64
 import json
-from datetime import datetime, timezone
-
-from nacl.signing import SigningKey
+from datetime import UTC, datetime
 
 from awid.did import did_from_public_key
 from awid.signing import canonical_json_bytes, sign_message
+from nacl.signing import SigningKey
 
 from atext.auth import _verify_certificate_signature
 
@@ -28,7 +27,7 @@ def test_certificate_signature_matches_awid_canonical_json() -> None:
         "member_address": "example.com/alice",
         "alias": "alice",
         "lifetime": "persistent",
-        "issued_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "issued_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     }
     cert["signature"] = sign_message(bytes(team_key), canonical_json_bytes(cert))
 

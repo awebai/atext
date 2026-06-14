@@ -1,4 +1,4 @@
-.PHONY: test compile run e2e e2e-up e2e-down site site-serve site-stop api-serve api-stop
+.PHONY: test test-server lint compile run e2e e2e-up e2e-down site site-serve site-stop api-serve api-stop
 
 HUGO_VERSION ?= 0.160.1
 SITE_PORT ?= 7333
@@ -6,6 +6,13 @@ API_PORT ?= 8765
 
 test:
 	PYTHONPATH=src:../aweb/awid/src:../pgdbm/src python3 -m pytest -q
+
+test-server:
+	uv run pytest -q
+
+lint:
+	uv run ruff check .
+	uv run mypy src
 
 e2e:
 	set -e; \
