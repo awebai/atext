@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import secrets
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
@@ -312,3 +315,103 @@ async def list_versions(db: AsyncDatabaseManager, *, principal: Principal, slug:
         document["document_id"],
     )
     return [dict(row) for row in rows]
+
+
+async def mint_presentation_link(
+    db: AsyncDatabaseManager,
+    *,
+    principal: Principal,
+    settings: Settings,
+    slug: str,
+    version: int | None,
+    ttl_seconds: int | None,
+) -> dict[str, Any]:
+    selected = await db.fetch_one(
+        """
+        SELECT d.document_id, COALESCE($3::integer, MAX(v.version_number)) AS version_number
+        FROM {{tables.documents}} d
+        JOIN {{tables.document_versions}} v ON v.document_id = d.document_id
+        WHERE d.team_id = $1 AND d.slug = $2
+        GROUP BY d.document_id
+        """,
+        principal.team_id,
+        slug,
+        version,
+    )
+    if selected is None or selected["version_number"] is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    document_id: UUID = selected["document_id"]
+    version_number = int(selected["version_number"])
+    exists = await db.fetch_one(
+        "SELECT 1 FROM {{tables.document_versions}} WHERE document_id = $1 AND version_number = $2",
+        document_id,
+        version_number,
+    )
+    if exists is None:
+        raise HTTPException(status_code=404, detail="Document version not found")
+
+    ttl = min(ttl_seconds or settings.default_present_ttl_seconds, settings.max_present_ttl_seconds)
+    expires_at = datetime.now(UTC) + timedelta(seconds=ttl)
+    token = secrets.token_urlsafe(32)
+    await db.execute(
+        """
+        INSERT INTO {{tables.presentation_links}}
+          (token, document_id, version_number, expires_at, created_by_did_key,
+           created_by_did_aw, created_by_alias, certificate_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """,
+        token,
+        document_id,
+        version_number,
+        expires_at,
+        principal.did_key,
+        principal.did_aw,
+        principal.alias,
+        principal.certificate_id,
+    )
+    return {
+        "token": token,
+        "url": f"{settings.public_origin.rstrip('/')}/present/{token}",
+        "expires_at": expires_at,
+    }
+
+
+async def revoke_presentation_link(
+    db: AsyncDatabaseManager,
+    *,
+    principal: Principal,
+    token: str,
+) -> None:
+    row = await db.fetch_one(
+        """
+        SELECT p.token
+        FROM {{tables.presentation_links}} p
+        JOIN {{tables.documents}} d ON d.document_id = p.document_id
+        WHERE p.token = $1 AND d.team_id = $2
+        """,
+        token,
+        principal.team_id,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Presentation not found")
+    await db.execute(
+        "UPDATE {{tables.presentation_links}} SET revoked_at = NOW() WHERE token = $1",
+        token,
+    )
+
+
+async def get_presented_document(db: AsyncDatabaseManager, *, token: str) -> dict[str, Any]:
+    row = await db.fetch_one(
+        """
+        SELECT v.body, p.expires_at
+        FROM {{tables.presentation_links}} p
+        JOIN {{tables.document_versions}} v
+          ON v.document_id = p.document_id AND v.version_number = p.version_number
+        WHERE p.token = $1 AND p.revoked_at IS NULL AND p.expires_at > NOW()
+        """,
+        token,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Presentation not found")
+    return {"body": row["body"], "expires_at": row["expires_at"]}
