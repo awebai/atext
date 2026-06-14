@@ -1,0 +1,159 @@
+{{ define "main" }}
+<article class="trust">
+  <header class="trust-hero">
+    <p class="eyebrow">the trust model</p>
+    <h1>Who says you are who you say?</h1>
+    <p class="lede">Every day your team's agents act for you — write a doc, hand a
+      stranger a link, call another company's service. Each time, the other side has to
+      answer one question: <em>who is this, and do they really speak for their team?</em>
+      The usual answer is &ldquo;they have an account with us.&rdquo; awid answers it
+      with no account at all. Here is the story of how.</p>
+  </header>
+
+  <section class="beat">
+    <h2>You already prove who you are every day</h2>
+    <p>You own a domain. When someone loads <code>acme.com</code> or gets an email from
+      it, they are already trusting that you &mdash; and only you &mdash; control it.
+      awid turns that everyday fact into identity. You publish one small DNS record that
+      says <em>this key speaks for acme.com</em>. Because no one but the domain's owner
+      can edit its DNS, the record itself is the proof. There is no signup form and no
+      company deciding to let you in: the root of trust is something you already hold.</p>
+    <details class="reveal">
+      <summary>see the actual record</summary>
+      <div class="terminal-frame">
+        <div class="terminal-bar"><span>dns</span></div>
+        <pre><code><span class="comment"># published once, at the domain you control</span>
+_awid.acme.com  TXT  "awid=v1; controller=did:key:z6Mk&hellip;"
+<span class="comment"># add  registry=https://&hellip;  to run your own registry; otherwise api.awid.ai</span></code></pre>
+      </div>
+    </details>
+  </section>
+
+  <section class="beat">
+    <h2>A key you can replace without becoming a stranger</h2>
+    <p>That record names a key. But keys get lost, leaked, or simply rotated &mdash; so
+      awid splits identity in two. Your <strong>stable id</strong> never changes; it is
+      who you are. Your <strong>signing key</strong> is what you sign with today, and you
+      can swap it any time without losing your history &mdash; like keeping your passport
+      number while replacing a worn-out signature. Apps follow the switch through a
+      signed, append-only log, so a rotation still looks like you, not an impostor.</p>
+    <details class="reveal">
+      <summary>see how an identity is named</summary>
+      <div class="terminal-frame">
+        <div class="terminal-bar"><span>identity</span></div>
+        <pre><code>address      acme.com/alice
+  &#9500;&#9472; stable id    did:aw:2CiZ88h&hellip;     <span class="comment"># never changes</span>
+  &#9492;&#9472; signing key  did:key:z6MkehRg&hellip;  <span class="comment"># current; rotates</span></code></pre>
+      </div>
+    </details>
+  </section>
+
+  <section class="beat">
+    <h2>A team is a group your domain vouches for</h2>
+    <p>One identity is not a team. So the domain's controller starts one &mdash;
+      <code>backend:acme.com</code> &mdash; and hands each member a
+      <strong>certificate</strong>: a small, signed card that says <em>this key belongs
+      to this team</em>. It is sealed by the team's own key, so no one can forge
+      membership or quietly add themselves. A teammate can even live on another domain:
+      <code>partner.com/bob</code> can hold a card for your team without leaving theirs.</p>
+    <details class="reveal">
+      <summary>look inside a certificate</summary>
+      <div class="terminal-frame">
+        <div class="terminal-bar"><span>certificate</span></div>
+        <pre><code>{
+  "team_id":        "backend:acme.com",
+  "member_did_key": "did:key:z6Mk&hellip;",   <span class="comment"># the member</span>
+  "member_address": "acme.com/alice",
+  "team_did_key":   "did:key:z6Mk&hellip;",   <span class="comment"># the team's key</span>
+  "certificate_id": "&hellip;",
+  "signature":      "&hellip;"               <span class="comment"># signed by the team key</span>
+}</code></pre>
+      </div>
+    </details>
+  </section>
+
+  <section class="beat">
+    <h2>Proving it, one request at a time</h2>
+    <p>Showing the card is not enough &mdash; a card can be photocopied. So every time an
+      agent acts, it <strong>signs the exact request</strong>: this action, on this path,
+      carrying this body, meant for this app, at this moment. The app re-checks each of
+      those against what actually arrived, traces the card back to the key your domain
+      published, and confirms the member was not revoked. If a single thing is off
+      &mdash; wrong audience, stale timestamp, unknown team &mdash; it refuses. It
+      <strong>fails closed</strong>, never open.</p>
+    <details class="reveal">
+      <summary>see the bytes a request signs</summary>
+      <div class="terminal-frame">
+        <div class="terminal-bar"><span>request</span></div>
+        <pre><code><span class="comment"># one signature covers all of this</span>
+{ "v":2, "method":"POST", "path":"/v1/documents",
+  "body_sha256":"&hellip;", "aud":"https://api.atext.ai",
+  "team_id":"backend:acme.com", "timestamp":"&hellip;Z" }
+
+<span class="comment"># the app verifies, in order &mdash; any miss fails closed</span>
+  1 canonical + v2     4 body hash matches      7 cert key == signer
+  2 timestamp fresh    5 method/path/aud/team   8 team key from awid
+  3 signature valid    6 &hellip;bound to request    9 not revoked</code></pre>
+      </div>
+    </details>
+  </section>
+
+  <section class="beat beat-payoff">
+    <h2>Why go to all this trouble?</h2>
+    <p>Because it buys things accounts cannot. No passwords to leak or reset. Private
+      keys never leave your machine &mdash; the registry only ever stores
+      <em>public</em> facts. Revoke a member once and they are locked out everywhere,
+      instantly. It spans organizations without anyone rehoming their identity. And every
+      link traces back to something you already own and already control: your domain.</p>
+
+    <figure class="diagram">
+      <svg viewBox="0 0 560 540" role="img" xmlns="http://www.w3.org/2000/svg"
+           aria-labelledby="chain-title chain-desc">
+        <title id="chain-title">The chain of trust</title>
+        <desc id="chain-desc">A domain you own names a key, that starts a team, that
+          vouches for members, who sign their requests — each link verified back to the
+          one DNS record.</desc>
+        <line x1="44" y1="60" x2="44" y2="468" stroke="var(--accent)" stroke-width="3"/>
+        <!-- 1 -->
+        <circle cx="44" cy="60" r="13" fill="var(--accent)"/>
+        <text x="44" y="65" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">1</text>
+        <rect x="74" y="32" width="462" height="56" rx="12" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="94" y="58" font-size="15" font-weight="700" fill="var(--ink)">A domain you own</text>
+        <text x="94" y="76" font-size="12.5" fill="var(--muted)">acme.com publishes one DNS record &mdash; only its owner can</text>
+        <!-- 2 -->
+        <circle cx="44" cy="162" r="13" fill="var(--accent)"/>
+        <text x="44" y="167" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">2</text>
+        <rect x="74" y="134" width="462" height="56" rx="12" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="94" y="160" font-size="15" font-weight="700" fill="var(--ink)">names a key</text>
+        <text x="94" y="178" font-size="12.5" fill="var(--muted)">the controller key, declared in that record</text>
+        <!-- 3 -->
+        <circle cx="44" cy="264" r="13" fill="var(--accent)"/>
+        <text x="44" y="269" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">3</text>
+        <rect x="74" y="236" width="462" height="56" rx="12" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="94" y="262" font-size="15" font-weight="700" fill="var(--ink)">that starts a team</text>
+        <text x="94" y="280" font-size="12.5" fill="var(--muted)">backend:acme.com &mdash; brought into being by the controller</text>
+        <!-- 4 -->
+        <circle cx="44" cy="366" r="13" fill="var(--accent)"/>
+        <text x="44" y="371" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">4</text>
+        <rect x="74" y="338" width="462" height="56" rx="12" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="94" y="364" font-size="15" font-weight="700" fill="var(--ink)">that vouches for members</text>
+        <text x="94" y="382" font-size="12.5" fill="var(--muted)">the team key signs each member a certificate</text>
+        <!-- 5 -->
+        <circle cx="44" cy="468" r="13" fill="var(--accent)"/>
+        <text x="44" y="473" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">5</text>
+        <rect x="74" y="440" width="462" height="56" rx="12" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="94" y="466" font-size="15" font-weight="700" fill="var(--ink)">who sign their requests</text>
+        <text x="94" y="484" font-size="12.5" fill="var(--muted)">atext checks the signature, the certificate, the revocation</text>
+      </svg>
+      <figcaption>Each request is checked link by link, all the way back to the one DNS
+        record only your domain can publish.</figcaption>
+    </figure>
+  </section>
+
+  <p class="trust-foot">
+    Want the exact contract? It is in the <a href="/docs/tutorial/">tutorial</a> and in
+    atext's <a href="https://github.com/awebai/atext">source</a>; the full identity model
+    lives at <a href="https://awid.ai">awid.ai</a>.
+  </p>
+</article>
+{{ end }}
