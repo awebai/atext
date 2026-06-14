@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: atext-api
+    env: docker
+    region: oregon
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: ATEXT_DATABASE_URL
+        sync: false
+      - key: ATEXT_AWID_REGISTRY_URL
+        value: https://api.awid.ai
+      - key: ATEXT_PUBLIC_ORIGIN
+        sync: false
+      - key: ATEXT_DB_POOL_MIN_CONNECTIONS
+        value: "1"
+      - key: ATEXT_DB_POOL_MAX_CONNECTIONS
+        value: "5"
+      - key: ATEXT_DB_STATEMENT_CACHE_SIZE
+        value: "0"

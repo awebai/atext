@@ -12,13 +12,21 @@ class ATextDatabase:
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.db = AsyncDatabaseManager(DatabaseConfig(connection_string=settings.database_url))
+        self.db = AsyncDatabaseManager(
+            DatabaseConfig(
+                connection_string=settings.database_url,
+                schema=None,
+                min_connections=settings.db_pool_min_connections,
+                max_connections=settings.db_pool_max_connections,
+                statement_cache_size=settings.db_statement_cache_size,
+            )
+        )
 
     async def connect(self) -> None:
         await self.db.connect()
         migrations = AsyncMigrationManager(
             self.db,
-            migrations_path=Path(__file__).parent / "migrations",
+            migrations_path=str(Path(__file__).parent / "migrations"),
             module_name="atext",
         )
         await migrations.apply_pending_migrations()

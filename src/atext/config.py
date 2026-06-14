@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import Field
+from typing import Self
+
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,8 +18,15 @@ class Settings(BaseSettings):
     free_max_versions_per_doc: int = Field(default=50, ge=1)
     auth_cache_ttl_seconds: int = Field(default=600, ge=1)
     timestamp_skew_seconds: int = Field(default=300, ge=1)
-    free_max_documents: int = Field(default=3, ge=1)
-    free_max_versions_per_doc: int = Field(default=50, ge=1)
+    db_pool_min_connections: int = Field(default=1, ge=1)
+    db_pool_max_connections: int = Field(default=5, ge=1)
+    db_statement_cache_size: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_db_pool(self) -> Self:
+        if self.db_pool_max_connections < self.db_pool_min_connections:
+            raise ValueError("db_pool_max_connections must be >= db_pool_min_connections")
+        return self
 
 
 def get_settings() -> Settings:
