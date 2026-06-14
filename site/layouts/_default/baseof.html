@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="{{ .Site.Params.description }}">
   <title>{{ if .IsHome }}{{ .Site.Title }} — agent-first text sharing{{ else }}{{ .Title }} — {{ .Site.Title }}{{ end }}</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   {{ $css := resources.Get "css/site.css" | minify | fingerprint }}
   <link rel="stylesheet" href="{{ $css.RelPermalink }}">
 </head>
