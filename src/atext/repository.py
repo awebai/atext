@@ -462,10 +462,25 @@ def _asset_response(row: Any) -> dict[str, Any]:
     return {"bytes": bytes(data["bytes"]), "content_type": data["content_type"]}
 
 
+_SAFE_LOGO_CONTENT_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+
+
+def _logo_magic_matches(payload: bytes, content_type: str) -> bool:
+    if content_type == "image/png":
+        return payload.startswith(b"\x89PNG\r\n\x1a\n")
+    if content_type == "image/jpeg":
+        return payload.startswith(b"\xff\xd8\xff")
+    if content_type == "image/gif":
+        return payload.startswith((b"GIF87a", b"GIF89a"))
+    if content_type == "image/webp":
+        return len(payload) >= 12 and payload.startswith(b"RIFF") and payload[8:12] == b"WEBP"
+    return False
+
+
 def _decode_logo(logo: Any) -> tuple[bytes, str]:
     content_type = str(logo.content_type).strip().lower()
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Logo content_type must be image/*")
+    if content_type not in _SAFE_LOGO_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Logo content_type must be image/png, image/jpeg, image/gif, or image/webp")
     try:
         payload = base64.b64decode(str(logo.data_base64), validate=True)
     except (binascii.Error, ValueError) as exc:
@@ -474,6 +489,8 @@ def _decode_logo(logo: Any) -> tuple[bytes, str]:
         raise HTTPException(status_code=400, detail="Logo must not be empty")
     if len(payload) > 256 * 1024:
         raise HTTPException(status_code=400, detail="Logo must be <= 256 KiB")
+    if not _logo_magic_matches(payload, content_type):
+        raise HTTPException(status_code=400, detail="Logo bytes must match content_type")
     return payload, content_type
 
 

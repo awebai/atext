@@ -67,7 +67,7 @@ def test_theme_migration_contains_team_scoped_assets_and_themes() -> None:
     assert "asset_id UUID PRIMARY KEY" in migration
     assert "team_id TEXT NOT NULL REFERENCES {{tables.teams}}" in migration
     assert "bytes BYTEA NOT NULL" in migration
-    assert "content_type TEXT NOT NULL CHECK (content_type LIKE 'image/%')" in migration
+    assert "content_type TEXT NOT NULL CHECK (content_type IN ('image/png', 'image/jpeg', 'image/gif', 'image/webp'))" in migration
     assert "CREATE TABLE IF NOT EXISTS {{tables.themes}}" in migration
     assert "team_id TEXT PRIMARY KEY REFERENCES {{tables.teams}}" in migration
     assert "tokens JSONB NOT NULL DEFAULT '{}'::jsonb" in migration

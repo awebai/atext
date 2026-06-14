@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS {{tables.assets}} (
     asset_id UUID PRIMARY KEY,
     team_id TEXT NOT NULL REFERENCES {{tables.teams}}(team_id) ON DELETE CASCADE,
     bytes BYTEA NOT NULL,
-    content_type TEXT NOT NULL CHECK (content_type LIKE 'image/%'),
+    content_type TEXT NOT NULL CHECK (content_type IN ('image/png', 'image/jpeg', 'image/gif', 'image/webp')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

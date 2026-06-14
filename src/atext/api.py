@@ -198,7 +198,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         database: Annotated[AsyncDatabaseManager, Depends(db)],
     ) -> Response:
         asset = await get_public_asset(database, asset_id=asset_id)
-        return Response(content=asset["bytes"], media_type=str(asset["content_type"]))
+        return Response(
+            content=asset["bytes"],
+            media_type=str(asset["content_type"]),
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
 
     @app.get("/present/{token}", response_class=HTMLResponse)
     async def present_route(

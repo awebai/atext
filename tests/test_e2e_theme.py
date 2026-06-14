@@ -29,6 +29,9 @@ _ONE_BY_ONE_PNG = base64.b64encode(
     b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfeA\xe2\x8b\x9b"
     b"\x00\x00\x00\x00IEND\xaeB`\x82"
 ).decode("ascii")
+_SVG_WITH_SCRIPT = base64.b64encode(
+    b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+).decode("ascii")
 
 
 def _put_theme(atext: RunningAText, team: Any, payload: dict[str, Any]) -> dict[str, Any]:
@@ -77,6 +80,26 @@ def test_theme_wraps_present_page_and_body_team_cannot_cross_scope(
         ),
     )
     _assert_aw_status(invalid_logo, 400, context="reject non-image logo content type")
+    svg_logo = _aw_request(
+        team_a,
+        "PUT",
+        f"{atext.origin}/v1/theme",
+        body=json.dumps(
+            {"logo": {"content_type": "image/svg+xml", "data_base64": _SVG_WITH_SCRIPT}},
+            separators=(",", ":"),
+        ),
+    )
+    _assert_aw_status(svg_logo, 400, context="reject SVG logo content type")
+    mismatched_logo = _aw_request(
+        team_a,
+        "PUT",
+        f"{atext.origin}/v1/theme",
+        body=json.dumps(
+            {"logo": {"content_type": "image/png", "data_base64": _SVG_WITH_SCRIPT}},
+            separators=(",", ":"),
+        ),
+    )
+    _assert_aw_status(mismatched_logo, 400, context="reject logo magic byte mismatch")
 
     theme = _put_theme(
         atext,
@@ -111,6 +134,7 @@ def test_theme_wraps_present_page_and_body_team_cannot_cross_scope(
     logo = httpx.get(theme["logo_url"], timeout=10.0)
     assert logo.status_code == 200, logo.text
     assert logo.headers["content-type"].startswith("image/png")
+    assert logo.headers["x-content-type-options"] == "nosniff"
     assert logo.content == base64.b64decode(_ONE_BY_ONE_PNG)
 
     themed = _mint_present(atext, team_a, slug="memo")
