@@ -60,8 +60,14 @@ def test_render_presented_page_sanitizes_theme_tokens_and_header_footer() -> Non
     assert "<img class=\"brand-logo\" src=\"/assets/logo-id\"" in html
 
 
-def test_theme_migration_contains_team_scoped_assets_and_themes() -> None:
-    migration = (Path(__file__).resolve().parents[1] / "src" / "atext" / "migrations" / "004_themes.sql").read_text()
+def test_repo_has_single_initial_migration() -> None:
+    migrations = sorted((Path(__file__).resolve().parents[1] / "src" / "atext" / "migrations").glob("*.sql"))
+
+    assert [migration.name for migration in migrations] == ["001_initial.sql"]
+
+
+def test_initial_migration_contains_team_scoped_assets_and_themes() -> None:
+    migration = (Path(__file__).resolve().parents[1] / "src" / "atext" / "migrations" / "001_initial.sql").read_text()
 
     assert "CREATE TABLE IF NOT EXISTS {{tables.assets}}" in migration
     assert "asset_id UUID PRIMARY KEY" in migration
@@ -76,8 +82,8 @@ def test_theme_migration_contains_team_scoped_assets_and_themes() -> None:
     assert "footer TEXT" in migration
 
 
-def test_presentation_links_migration_is_document_version_bound() -> None:
-    migration = (Path(__file__).resolve().parents[1] / "src" / "atext" / "migrations" / "003_presentation_links.sql").read_text()
+def test_initial_migration_presentation_links_are_document_version_bound() -> None:
+    migration = (Path(__file__).resolve().parents[1] / "src" / "atext" / "migrations" / "001_initial.sql").read_text()
 
     assert "CREATE TABLE IF NOT EXISTS {{tables.presentation_links}}" in migration
     assert "token TEXT PRIMARY KEY" in migration

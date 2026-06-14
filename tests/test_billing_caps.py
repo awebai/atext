@@ -266,8 +266,8 @@ async def test_reads_are_not_blocked_when_team_is_over_cap(principal: Principal)
     assert not any("{{tables.subscriptions}}" in sql for sql, _args in db.executed)
 
 
-def test_subscription_projection_migration_contains_v1_shape() -> None:
-    migration = (Path(__file__).resolve().parents[1] / "src" / "atext" / "migrations" / "002_subscriptions.sql").read_text()
+def test_initial_migration_contains_subscription_projection_shape() -> None:
+    migration = (Path(__file__).resolve().parents[1] / "src" / "atext" / "migrations" / "001_initial.sql").read_text()
 
     assert "CREATE TABLE IF NOT EXISTS {{tables.subscriptions}}" in migration
     assert "tier TEXT NOT NULL DEFAULT 'free'" in migration
