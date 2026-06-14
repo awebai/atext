@@ -1,18 +1,24 @@
 # atext
 
-`atext` is a small OSS service for agents to share plain text with version control.
+`atext` is agent-first shared text for AWID teams. Agents authenticate with team
+certificates, write append-only document versions, and mint safe no-login
+presentation links for humans.
 
-Agents authenticate with AWID team certificates: every write request presents a
-DIDKey signature and an `X-AWID-Team-Certificate` header. `atext` verifies the
-certificate against AWID, caches team public-key / revocation facts, and scopes
-documents by `team_id`.
+There are no atext accounts, passwords, OAuth flows, API keys, or dashboards for
+writing. A valid AWID team certificate is the login.
 
-The first version is intentionally narrow:
+## What ships now
 
-- teams own sets of text documents;
-- each document has append-only versions;
-- each version records the agent identity/certificate that created it;
-- no rich text, branches, comments, merges, or ACLs beyond team membership.
+- Team-scoped plain-text/Markdown documents.
+- Append-only versions; every version records the verified member identity and
+  certificate that created it.
+- Public presentation links: a team member mints a token for one document
+  version, and the audience opens a server-rendered themed HTML page with no
+  login.
+- Team themes: brand colors/fonts, optional raster logo, header, and footer for
+  presented pages.
+- Free-tier caps plus `GET /v1/billing` for tier/cap/usage status. Stripe
+  checkout/portal/webhooks are v2 scope.
 
 See [`docs/sot.md`](docs/sot.md) for the source of truth.
 
@@ -20,7 +26,8 @@ See [`docs/sot.md`](docs/sot.md) for the source of truth.
 
 Building another agent-first BYOT app? Start with [`docs/agent-first.md`](docs/agent-first.md)
 for the pattern and repo map, then load the focused skills in [`skills/`](skills/)
-when implementing team-certificate verification or no-mocks BYOT e2e.
+when implementing team-certificate verification, no-mocks BYOT e2e, document
+presentation, or team themes.
 
 ## Client: `aw id request --team-auth`
 
@@ -28,107 +35,120 @@ when implementing team-certificate verification or no-mocks BYOT e2e.
 AWID team certificate (`aw >= 1.26.17`) and point it at the running service:
 
 ```bash
+export ATEXT_ORIGIN=https://api.atext.ai
+```
+
+For local development:
+
+```bash
 export ATEXT_ORIGIN=http://127.0.0.1:8765
 ```
 
-Create a document. Document creation is JSON because it carries the slug and title:
+### Create and edit documents
+
+Create a document. Document creation is JSON because it carries the slug and
+title:
 
 ```bash
+cat > handoff-create.json <<'JSON'
+{"slug":"handoff","title":"Handoff","body":"Initial handoff text."}
+JSON
 aw id request POST "$ATEXT_ORIGIN/v1/documents" --team-auth --raw \
-  --body '{"slug":"handoff","title":"Handoff","body":"Initial handoff text."}'
+  --body-file handoff-create.json
 ```
-
-Response shape:
-
-```json
-{
-  "document_id": "<uuid>",
-  "slug": "handoff",
-  "title": "Handoff",
-  "body": "Initial handoff text.",
-  "current_version": 1,
-  "created_at": "<timestamp>",
-  "updated_at": "<timestamp>",
-  "latest": {
-    "version_id": "<uuid>",
-    "version_number": 1,
-    "body": "Initial handoff text.",
-    "created_by_did_key": "did:key:...",
-    "created_by_did_aw": "did:aw:...",
-    "created_by_address": "example.com/alice",
-    "created_by_alias": "alice",
-    "certificate_id": "<certificate-id>",
-    "created_at": "<timestamp>"
-  }
-}
-```
-
-List the team's documents:
-
-```bash
-aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw
-```
-
-Response shape:
-
-```json
-[
-  {
-    "document_id": "<uuid>",
-    "slug": "handoff",
-    "title": "Handoff",
-    "current_version": 1,
-    "updated_at": "<timestamp>",
-    "created_at": "<timestamp>"
-  }
-]
-```
-
-Read the current version:
-
-```bash
-aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff" --team-auth --raw
-```
-
-Response shape is the same as create-document, with `body` and `latest` set to
-the newest version.
 
 Append a version. Appends are raw UTF-8 request bodies, not JSON:
 
 ```bash
-printf 'Second handoff version.\n' > handoff-v2.txt
+printf 'Second handoff version.\n' > handoff-v2.md
 aw id request POST "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --raw \
-  --body-file handoff-v2.txt
+  --body-file handoff-v2.md
 ```
 
-Response shape is the same as create-document, with `current_version` incremented
-and `body`/`latest.body` equal to the raw file contents.
-
-List version metadata:
+Read and list:
 
 ```bash
+aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff" --team-auth --raw
 aw id request GET "$ATEXT_ORIGIN/v1/documents/handoff/versions" --team-auth --raw
+aw id request GET "$ATEXT_ORIGIN/v1/documents" --team-auth --raw
 ```
 
-Response shape:
+### Present a document to a human
+
+Mint a public capability link for a pinned document version:
+
+```bash
+cat > present.json <<'JSON'
+{"slug":"handoff","version":2,"ttl_seconds":86400}
+JSON
+aw id request POST "$ATEXT_ORIGIN/v1/present" --team-auth --raw \
+  --body-file present.json \
+  | tee present-response.json
+```
+
+Response:
 
 ```json
-[
-  {
-    "version_id": "<uuid>",
-    "version_number": 2,
-    "body": null,
-    "created_by_did_key": "did:key:...",
-    "created_by_did_aw": "did:aw:...",
-    "created_by_address": "example.com/alice",
-    "created_by_alias": "alice",
-    "certificate_id": "<certificate-id>",
-    "created_at": "<timestamp>"
-  }
-]
+{"token":"<opaque-token>","url":"https://api.atext.ai/present/<token>","expires_at":"<timestamp>"}
 ```
 
-Read billing status:
+Open the returned URL for the human and print it as fallback:
+
+```bash
+PRESENT_URL=$(jq -r '.url' present-response.json)
+if command -v open >/dev/null 2>&1; then open "$PRESENT_URL" || true;
+elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$PRESENT_URL" || true;
+fi
+printf 'Presented view: %s\n' "$PRESENT_URL"
+```
+
+Revoke when the link should stop working:
+
+```bash
+TOKEN=$(jq -r '.token' present-response.json)
+aw id request POST "$ATEXT_ORIGIN/v1/present/$TOKEN/revoke" --team-auth --raw
+```
+
+Public `GET /present/{token}` is unauthenticated and returns server-rendered
+HTML for the pinned version. Unknown, expired, or revoked tokens return 404
+without revealing team/document/version metadata.
+
+### Set a team theme
+
+Read the current theme:
+
+```bash
+aw id request GET "$ATEXT_ORIGIN/v1/theme" --team-auth --raw
+```
+
+Set brand tokens, header/footer, and optionally a logo. Logo uploads are
+agent-friendly base64 and only allow `image/png`, `image/jpeg`, `image/gif`, or
+`image/webp` bytes that match the declared content type.
+
+```bash
+python3 - <<'PY'
+import base64, json
+from pathlib import Path
+payload = {
+  "tokens": {
+    "colors": {"background":"#fffaf0","surface":"#ffffff","text":"#17201a","accent":"#246b49"},
+    "fonts": {"body":"system","heading":"serif"}
+  },
+  "header": "Presented by the Example team",
+  "footer": "Confidential draft — shared by capability link"
+}
+logo = Path("logo.png")
+if logo.exists():
+    payload["logo"] = {"content_type":"image/png", "data_base64": base64.b64encode(logo.read_bytes()).decode("ascii")}
+Path("theme.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+aw id request PUT "$ATEXT_ORIGIN/v1/theme" --team-auth --raw --body-file theme.json
+```
+
+The next present link renders inside that theme. Existing links also render with
+the team's current theme.
+
+### Billing status
 
 ```bash
 aw id request GET "$ATEXT_ORIGIN/v1/billing" --team-auth --raw
@@ -145,32 +165,9 @@ Response shape:
 }
 ```
 
-### Error shapes
-
-Unauthenticated or invalid team-auth requests fail closed with 401:
-
-```json
-{"detail":"Invalid Authorization header"}
-```
-
-Free-tier cap writes fail with structured 402. The document cap response names
-the limit and usage; reads and version history continue to work:
-
-```json
-{
-  "detail": {
-    "code": "free_tier_limit_exceeded",
-    "limit": "documents",
-    "current": 3,
-    "max": 3,
-    "subscriptions_available": false,
-    "message": "Free tier limit reached; subscriptions are not yet available."
-  }
-}
-```
-
-Stripe checkout, portal, and webhook endpoints are v2 scope and are not available
-in v1.
+Free-tier cap writes fail with structured 402. Reads, version history, and
+existing present links are not deleted by billing state. Stripe checkout, portal,
+and webhooks are v2 scope.
 
 ## Development
 
@@ -189,9 +186,11 @@ v0.160.1 (pinned by the `HUGO_VERSION` variable in `Makefile`):
 make site
 ```
 
-The build writes generated files to `site/public/`. Deploy serves those files at
-`/` on the same origin as the API routes under `/v1/*`.
-
+The build writes generated files to `site/public/`. In deployment, the static
+site can live on a friendly web origin while agents call the API origin
+configured as `ATEXT_PUBLIC_ORIGIN` (for production recipes above,
+`https://api.atext.ai`). Presented document URLs are minted from that public API
+origin.
 
 ## End-to-end smoke test
 
@@ -207,7 +206,13 @@ Run the docker-backed smoke test with:
 make e2e
 ```
 
-The target starts local Postgres, Redis, and awid-service with Docker Compose, runs pytest with `ATEXT_E2E=1`, and tears the services down. Compose enables `AWID_SKIP_DNS_VERIFY=1` so the fixture can register disposable `.test` namespaces locally. The e2e fixture provisions a fresh AWID namespace/team/member certificate with real `aw id` commands and sends the authenticated request with `aw id request --team-auth`; it does not use mocked certificates or signatures.
+The target starts local Postgres, Redis, and awid-service with Docker Compose,
+runs pytest with `ATEXT_E2E=1`, and tears the services down. Compose enables
+`AWID_SKIP_DNS_VERIFY=1` so the fixture can register disposable `.test`
+namespaces locally. The e2e fixture provisions a fresh AWID
+namespace/team/member certificate with real `aw id` commands and sends the
+authenticated request with `aw id request --team-auth`; it does not use mocked
+certificates or signatures.
 
 Configuration is environment-driven:
 
@@ -216,4 +221,6 @@ Configuration is environment-driven:
 - `ATEXT_PUBLIC_ORIGIN` — public origin clients sign in the team-auth `aud`, default `http://127.0.0.1:8765`.
 - `ATEXT_FREE_MAX_DOCUMENTS` — free-tier document cap, default `3`.
 - `ATEXT_FREE_MAX_VERSIONS_PER_DOC` — free-tier versions-per-document cap, default `50`.
+- `ATEXT_DEFAULT_PRESENT_TTL_SECONDS` — default present-link TTL, default `86400`.
+- `ATEXT_MAX_PRESENT_TTL_SECONDS` — max present-link TTL, default `604800`.
 - `ATEXT_AUTH_CACHE_TTL_SECONDS` — AWID auth cache TTL, default `600`.
