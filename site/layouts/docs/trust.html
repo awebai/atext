@@ -6,18 +6,95 @@
     <p class="lede">Every day your team's agents act for you — write a doc, hand a
       stranger a link, call another company's service. Each time, the other side has to
       answer one question: <em>who is this, and do they really speak for their team?</em>
-      The usual answer is &ldquo;they have an account with us.&rdquo; awid answers it
-      with no account at all. Here is the story of how.</p>
+      The usual answer is &ldquo;they have an account with us.&rdquo;
+      <a href="https://awid.ai">awid</a> answers it with no account at all.</p>
   </header>
+
+  <p class="trust-map">The whole chain on one page &mdash; the story below walks each link:</p>
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg"
+         viewBox="0 0 320 620"
+         role="img"
+         aria-labelledby="cot-title cot-desc"
+         font-family="ui-sans-serif, system-ui, -apple-system, sans-serif">
+      <title id="cot-title">Chain of trust: how an awid identity is verified</title>
+      <desc id="cot-desc">A vertical diagram of five layers, each signed by the layer
+        above. At the top your domain (acme.com) publishes one DNS TXT record named
+        _awid. That record names a controller key. The controller starts a team
+        (backend:acme.com) with its own key. The team key signs a certificate for each
+        member (acme.com/alice). Each member signs their requests, which any app verifies
+        by tracing the chain back up to the single DNS record only the domain owner can
+        publish.</desc>
+      <g aria-hidden="true">
+        <rect width="320" height="620" fill="var(--bg)"/>
+        <line x1="160" y1="84" x2="160" y2="524" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="36" y1="524" x2="36" y2="84" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 5" stroke-linecap="round" opacity="0.35"/>
+        <polygon points="36,78 32,89 40,89" fill="var(--accent)" opacity="0.35"/>
+        <text x="28" y="304" font-size="9" fill="var(--accent)" text-anchor="middle" opacity="0.6" letter-spacing="0.06em" transform="rotate(-90, 28, 304)">verifies back to domain</text>
+        <!-- node 1: domain / dns root -->
+        <rect x="56" y="44" width="3" height="80" fill="var(--accent)" rx="1.5"/>
+        <rect x="60" y="44" width="204" height="80" rx="12" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="80" y="68" font-size="10" fill="var(--muted)" letter-spacing="0.08em">YOUR DOMAIN</text>
+        <text x="80" y="88" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="var(--ink)" font-weight="600">acme.com</text>
+        <text x="80" y="108" font-size="10.5" fill="var(--muted)">publishes one DNS record</text>
+        <rect x="196" y="52" width="56" height="20" rx="6" fill="var(--accent)"/>
+        <text x="224" y="65.5" font-size="9" fill="#fff" text-anchor="middle" letter-spacing="0.04em" font-family="ui-monospace, SFMono-Regular, monospace">_awid TXT</text>
+        <polygon points="160,130 155,120 165,120" fill="var(--accent)"/>
+        <!-- node 2: controller key -->
+        <rect x="60" y="136" width="204" height="80" rx="12" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="80" y="160" font-size="10" fill="var(--muted)" letter-spacing="0.08em">CONTROLLER KEY</text>
+        <text x="80" y="180" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="var(--ink)" font-weight="600">did:key:z6Mk&#8230;</text>
+        <text x="80" y="200" font-size="10.5" fill="var(--muted)">named by that record</text>
+        <polygon points="160,222 155,212 165,212" fill="var(--accent)"/>
+        <!-- node 3: team -->
+        <rect x="60" y="228" width="204" height="80" rx="12" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="80" y="252" font-size="10" fill="var(--muted)" letter-spacing="0.08em">TEAM</text>
+        <text x="80" y="272" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="var(--ink)" font-weight="600">backend:acme.com</text>
+        <text x="80" y="292" font-size="10.5" fill="var(--muted)">started by the controller</text>
+        <polygon points="160,314 155,304 165,304" fill="var(--accent)"/>
+        <!-- node 4: member certificate -->
+        <rect x="60" y="320" width="204" height="80" rx="12" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="80" y="344" font-size="10" fill="var(--muted)" letter-spacing="0.08em">MEMBER</text>
+        <text x="80" y="364" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="var(--ink)" font-weight="600">acme.com/alice</text>
+        <text x="80" y="384" font-size="10.5" fill="var(--muted)">vouched for by the team</text>
+        <polygon points="160,406 155,396 165,396" fill="var(--accent)"/>
+        <!-- node 5: signed request (resolved) -->
+        <rect x="60" y="412" width="204" height="80" rx="12" fill="var(--accent)" stroke="var(--accent)"/>
+        <text x="80" y="436" font-size="10" fill="#fff" letter-spacing="0.08em" opacity="0.8">SIGNED REQUEST</text>
+        <text x="80" y="456" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#fff" font-weight="600">POST /v1/documents</text>
+        <text x="80" y="476" font-size="10.5" fill="#fff" opacity="0.8">signed by alice, verified</text>
+        <rect x="227" y="430" width="28" height="28" rx="8" fill="#fff" opacity="0.18"/>
+        <polyline points="233,444 239,450 246,438" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <!-- flow verbs on the spine -->
+        <rect x="166" y="119" width="38" height="14" rx="4" fill="var(--bg)"/>
+        <text x="185" y="129.5" font-size="9" fill="var(--accent)" text-anchor="middle" font-weight="600" letter-spacing="0.04em">names</text>
+        <rect x="166" y="211" width="38" height="14" rx="4" fill="var(--bg)"/>
+        <text x="185" y="221.5" font-size="9" fill="var(--accent)" text-anchor="middle" font-weight="600" letter-spacing="0.04em">starts</text>
+        <rect x="166" y="303" width="34" height="14" rx="4" fill="var(--bg)"/>
+        <text x="183" y="313.5" font-size="9" fill="var(--accent)" text-anchor="middle" font-weight="600" letter-spacing="0.04em">signs</text>
+        <rect x="166" y="395" width="34" height="14" rx="4" fill="var(--bg)"/>
+        <text x="183" y="405.5" font-size="9" fill="var(--accent)" text-anchor="middle" font-weight="600" letter-spacing="0.04em">signs</text>
+        <!-- bottom caption strip -->
+        <line x1="60" y1="508" x2="260" y2="508" stroke="var(--line)"/>
+        <text x="160" y="524" font-size="10" fill="var(--muted)" text-anchor="middle">Trust flows&#160;<tspan fill="var(--accent)" font-weight="600">down</tspan>&#160;&#183;&#160;verification traces&#160;<tspan fill="var(--accent)" font-weight="600">up</tspan>&#160;to DNS</text>
+        <line x1="36" y1="84" x2="60" y2="84" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 4" opacity="0.35"/>
+        <line x1="36" y1="524" x2="60" y2="492" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 4" opacity="0.35"/>
+      </g>
+    </svg>
+    <figcaption>Trust flows <strong>down</strong> &mdash; each layer signed by the one
+      above. Verification traces back <strong>up</strong> to the one DNS record only your
+      domain can publish.</figcaption>
+  </figure>
 
   <section class="beat">
     <h2>You already prove who you are every day</h2>
     <p>You own a domain. When someone loads <code>acme.com</code> or gets an email from
       it, they are already trusting that you &mdash; and only you &mdash; control it.
-      awid turns that everyday fact into identity. You publish one small DNS record that
-      says <em>this key speaks for acme.com</em>. Because no one but the domain's owner
-      can edit its DNS, the record itself is the proof. There is no signup form and no
-      company deciding to let you in: the root of trust is something you already hold.</p>
+      <a href="https://awid.ai">awid</a> turns that everyday fact into identity. You
+      publish one small DNS record that says <em>this key speaks for acme.com</em>.
+      Because no one but the domain's owner can edit its DNS, the record itself is the
+      proof. There is no signup form and no company deciding to let you in: the root of
+      trust is something you already hold.</p>
     <details class="reveal">
       <summary>see the actual record</summary>
       <div class="terminal-frame">
@@ -30,7 +107,7 @@ _awid.acme.com  TXT  "awid=v1; controller=did:key:z6Mk&hellip;"
       </div>
     </details>
     <details class="reveal">
-      <summary>what about subdomains?</summary>
+      <summary>see how subdomains are delegated</summary>
       <div class="terminal-frame">
         <div class="terminal-bar"><span>delegation</span></div>
         <pre><code><span class="comment"># a verified parent can authorize a child &mdash; no second DNS record</span>
@@ -42,16 +119,16 @@ acme.com  (verified)  &#8594;  dev.acme.com   <span class="comment"># child gets
 
   <section class="beat">
     <h2>A key you can replace without becoming a stranger</h2>
-    <p>That record names a key. But keys get lost, leaked, or simply rotated &mdash; so
-      awid splits identity in two. Your <strong>stable id</strong> is who you are, and it
-      never changes. Your <strong>signing key</strong> is what you sign with today, and
-      you can swap it any time without becoming a stranger &mdash; like keeping your
-      passport number while replacing a worn-out signature. Each change is appended to a
-      signed log, so a verifier can tell an ordinary rotation from a suspicious one. Not
-      every agent needs all this: one working inside a single workspace can just be a key
-      and a team card. The ones that need to be found and followed across systems also get
-      a public handle &mdash; an address like <code>acme.com/alice</code> &mdash; that
-      points back to the stable id.</p>
+    <p>That record names a key &mdash; which creates a problem. Keys get compromised,
+      expire, or simply need replacing, and if your identity <em>were</em> the key,
+      replacing it would make you a stranger to everyone who knows you. So
+      <a href="https://awid.ai">awid</a> splits identity in two &mdash; like keeping your
+      passport number while you replace a worn-out signature. Your <strong>stable id</strong>
+      is who you are, and it never changes. Your <strong>signing key</strong> is what you
+      sign with today, and you can swap it any time. Each change is appended to a signed
+      log, so a verifier can tell an ordinary rotation from a suspicious one. Identities
+      that need to be found across systems also get a public handle &mdash; an address
+      like <code>acme.com/alice</code> &mdash; that points back to the stable id.</p>
     <details class="reveal">
       <summary>see how an identity is named</summary>
       <div class="terminal-frame">
@@ -65,7 +142,7 @@ acme.com  (verified)  &#8594;  dev.acme.com   <span class="comment"># child gets
       </div>
     </details>
     <details class="reveal">
-      <summary>how a key change is judged</summary>
+      <summary>see how a key change is judged</summary>
       <div class="terminal-frame">
         <div class="terminal-bar"><span>key log</span></div>
         <pre><code><span class="comment"># every key change is appended to a signed, hash-chained log</span>
@@ -81,10 +158,11 @@ HARD_ERROR    <span class="comment"># rewritten history &mdash; reject</span></c
     <p>One identity is not a team. So the domain's controller <em>creates</em> one
       &mdash; <code>backend:acme.com</code> &mdash; with a key of its own. That
       <strong>team key</strong> then signs a <strong>certificate</strong> for each member:
-      a small card that says <em>this key belongs to this team</em>. Because only the team
-      key can sign it, no one can forge membership or quietly add themselves. A teammate
-      can even live on another domain: <code>partner.com/bob</code> can hold a card for
-      your team without leaving theirs.</p>
+      a small card that says <em>this key belongs to this team</em>. Because the
+      certificate is signed by the team key &mdash; not managed by a central platform
+      &mdash; no one can forge membership or quietly add themselves, and a teammate can
+      even live on another domain: <code>partner.com/bob</code> can hold a card for your
+      team without leaving theirs.</p>
     <details class="reveal">
       <summary>look inside a certificate</summary>
       <div class="terminal-frame">
@@ -113,8 +191,8 @@ HARD_ERROR    <span class="comment"># rewritten history &mdash; reject</span></c
       carrying this body, meant for this app, at this moment. The app re-checks each of
       those against what actually arrived, traces the card back to the key your domain
       published, and confirms the member was not revoked. If a single thing is off
-      &mdash; wrong audience, stale timestamp, unknown team &mdash; it refuses. It
-      <strong>fails closed</strong>, never open.</p>
+      &mdash; wrong audience, stale timestamp, unknown team &mdash; it refuses. A single
+      mismatch locks the door; nothing slips through.</p>
     <details class="reveal">
       <summary>see the bytes a request signs</summary>
       <div class="terminal-frame">
@@ -139,49 +217,6 @@ HARD_ERROR    <span class="comment"># rewritten history &mdash; reject</span></c
       <em>public</em> facts. Revoke a member once and they are locked out everywhere,
       instantly. It spans organizations without anyone rehoming their identity. And every
       link traces back to something you already own and already control: your domain.</p>
-
-    <figure class="diagram">
-      <svg viewBox="0 0 560 540" role="img" xmlns="http://www.w3.org/2000/svg"
-           aria-labelledby="chain-title chain-desc">
-        <title id="chain-title">The chain of trust</title>
-        <desc id="chain-desc">A domain you own names a key, that starts a team, that
-          vouches for members, who sign their requests — each link verified back to the
-          one DNS record.</desc>
-        <line x1="44" y1="60" x2="44" y2="468" stroke="var(--accent)" stroke-width="3"/>
-        <!-- 1 -->
-        <circle cx="44" cy="60" r="13" fill="var(--accent)"/>
-        <text x="44" y="65" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">1</text>
-        <rect x="74" y="32" width="462" height="56" rx="12" fill="var(--panel)" stroke="var(--line)"/>
-        <text x="94" y="58" font-size="15" font-weight="700" fill="var(--ink)">A domain you own</text>
-        <text x="94" y="76" font-size="12.5" fill="var(--muted)">acme.com publishes one DNS record &mdash; only its owner can</text>
-        <!-- 2 -->
-        <circle cx="44" cy="162" r="13" fill="var(--accent)"/>
-        <text x="44" y="167" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">2</text>
-        <rect x="74" y="134" width="462" height="56" rx="12" fill="var(--panel)" stroke="var(--line)"/>
-        <text x="94" y="160" font-size="15" font-weight="700" fill="var(--ink)">names a key</text>
-        <text x="94" y="178" font-size="12.5" fill="var(--muted)">the controller key, declared in that record</text>
-        <!-- 3 -->
-        <circle cx="44" cy="264" r="13" fill="var(--accent)"/>
-        <text x="44" y="269" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">3</text>
-        <rect x="74" y="236" width="462" height="56" rx="12" fill="var(--panel)" stroke="var(--line)"/>
-        <text x="94" y="262" font-size="15" font-weight="700" fill="var(--ink)">that starts a team</text>
-        <text x="94" y="280" font-size="12.5" fill="var(--muted)">backend:acme.com &mdash; brought into being by the controller</text>
-        <!-- 4 -->
-        <circle cx="44" cy="366" r="13" fill="var(--accent)"/>
-        <text x="44" y="371" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">4</text>
-        <rect x="74" y="338" width="462" height="56" rx="12" fill="var(--panel)" stroke="var(--line)"/>
-        <text x="94" y="364" font-size="15" font-weight="700" fill="var(--ink)">that vouches for members</text>
-        <text x="94" y="382" font-size="12.5" fill="var(--muted)">the team key signs each member a certificate</text>
-        <!-- 5 -->
-        <circle cx="44" cy="468" r="13" fill="var(--accent)"/>
-        <text x="44" y="473" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">5</text>
-        <rect x="74" y="440" width="462" height="56" rx="12" fill="var(--panel)" stroke="var(--line)"/>
-        <text x="94" y="466" font-size="15" font-weight="700" fill="var(--ink)">who sign their requests</text>
-        <text x="94" y="484" font-size="12.5" fill="var(--muted)">atext checks the signature, the certificate, the revocation</text>
-      </svg>
-      <figcaption>Each request is checked link by link, all the way back to the one DNS
-        record only your domain can publish.</figcaption>
-    </figure>
   </section>
 
   <p class="trust-foot">
