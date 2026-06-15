@@ -24,7 +24,18 @@
         <div class="terminal-bar"><span>dns</span></div>
         <pre><code><span class="comment"># published once, at the domain you control</span>
 _awid.acme.com  TXT  "awid=v1; controller=did:key:z6Mk&hellip;"
-<span class="comment"># add  registry=https://&hellip;  to run your own registry; otherwise api.awid.ai</span></code></pre>
+<span class="comment"># add  registry=https://&hellip;  to run your own registry; otherwise api.awid.ai</span>
+<span class="comment"># the record bootstraps the controller key; that key then signs the</span>
+<span class="comment"># namespace's actions, and DNS stays the root authority for recovery</span></code></pre>
+      </div>
+    </details>
+    <details class="reveal">
+      <summary>what about subdomains?</summary>
+      <div class="terminal-frame">
+        <div class="terminal-bar"><span>delegation</span></div>
+        <pre><code><span class="comment"># a verified parent can authorize a child &mdash; no second DNS record</span>
+acme.com  (verified)  &#8594;  dev.acme.com   <span class="comment"># child gets its own key</span>
+<span class="comment"># the parent controller signs the child operation; not automatic inheritance</span></code></pre>
       </div>
     </details>
   </section>
@@ -32,40 +43,63 @@ _awid.acme.com  TXT  "awid=v1; controller=did:key:z6Mk&hellip;"
   <section class="beat">
     <h2>A key you can replace without becoming a stranger</h2>
     <p>That record names a key. But keys get lost, leaked, or simply rotated &mdash; so
-      awid splits identity in two. Your <strong>stable id</strong> never changes; it is
-      who you are. Your <strong>signing key</strong> is what you sign with today, and you
-      can swap it any time without losing your history &mdash; like keeping your passport
-      number while replacing a worn-out signature. Apps follow the switch through a
-      signed, append-only log, so a rotation still looks like you, not an impostor.</p>
+      awid splits identity in two. Your <strong>stable id</strong> is who you are, and it
+      never changes. Your <strong>signing key</strong> is what you sign with today, and
+      you can swap it any time without becoming a stranger &mdash; like keeping your
+      passport number while replacing a worn-out signature. Each change is appended to a
+      signed log, so a verifier can tell an ordinary rotation from a suspicious one. Not
+      every agent needs all this: one working inside a single workspace can just be a key
+      and a team card. The ones that need to be found and followed across systems also get
+      a public handle &mdash; an address like <code>acme.com/alice</code> &mdash; that
+      points back to the stable id.</p>
     <details class="reveal">
       <summary>see how an identity is named</summary>
       <div class="terminal-frame">
         <div class="terminal-bar"><span>identity</span></div>
-        <pre><code>address      acme.com/alice
-  &#9500;&#9472; stable id    did:aw:2CiZ88h&hellip;     <span class="comment"># never changes</span>
-  &#9492;&#9472; signing key  did:key:z6MkehRg&hellip;  <span class="comment"># current; rotates</span></code></pre>
+        <pre><code>did:aw:2CiZ88h&hellip;             <span class="comment"># the stable identity &mdash; this is "you"</span>
+  &#9500;&#9472; did:key:z6MkehRg&hellip;    <span class="comment"># current signing key; rotates</span>
+  &#9492;&#9472; acme.com/alice           <span class="comment"># a public handle bound to the identity</span>
+
+<span class="comment"># a local, workspace-only agent is just a did:key + a team certificate &mdash;</span>
+<span class="comment"># no did:aw, no address, and not recoverable if the key is lost</span></code></pre>
+      </div>
+    </details>
+    <details class="reveal">
+      <summary>how a key change is judged</summary>
+      <div class="terminal-frame">
+        <div class="terminal-bar"><span>key log</span></div>
+        <pre><code><span class="comment"># every key change is appended to a signed, hash-chained log</span>
+OK_VERIFIED   <span class="comment"># signature + chain check out &mdash; a normal rotation</span>
+OK_DEGRADED   <span class="comment"># usable, but falls back to trust-on-first-use</span>
+HARD_ERROR    <span class="comment"># rewritten history &mdash; reject</span></code></pre>
       </div>
     </details>
   </section>
 
   <section class="beat">
     <h2>A team is a group your domain vouches for</h2>
-    <p>One identity is not a team. So the domain's controller starts one &mdash;
-      <code>backend:acme.com</code> &mdash; and hands each member a
-      <strong>certificate</strong>: a small, signed card that says <em>this key belongs
-      to this team</em>. It is sealed by the team's own key, so no one can forge
-      membership or quietly add themselves. A teammate can even live on another domain:
-      <code>partner.com/bob</code> can hold a card for your team without leaving theirs.</p>
+    <p>One identity is not a team. So the domain's controller <em>creates</em> one
+      &mdash; <code>backend:acme.com</code> &mdash; with a key of its own. That
+      <strong>team key</strong> then signs a <strong>certificate</strong> for each member:
+      a small card that says <em>this key belongs to this team</em>. Because only the team
+      key can sign it, no one can forge membership or quietly add themselves. A teammate
+      can even live on another domain: <code>partner.com/bob</code> can hold a card for
+      your team without leaving theirs.</p>
     <details class="reveal">
       <summary>look inside a certificate</summary>
       <div class="terminal-frame">
         <div class="terminal-bar"><span>certificate</span></div>
         <pre><code>{
   "team_id":        "backend:acme.com",
-  "member_did_key": "did:key:z6Mk&hellip;",   <span class="comment"># the member</span>
-  "member_address": "acme.com/alice",
-  "team_did_key":   "did:key:z6Mk&hellip;",   <span class="comment"># the team's key</span>
   "certificate_id": "&hellip;",
+  "member_did_key": "did:key:z6Mk&hellip;",   <span class="comment"># the key this card authorizes</span>
+  "alias":          "alice",
+  "identity_scope": "global",               <span class="comment"># or "local"</span>
+  "member_did_aw":  "did:aw:2CiZ88h&hellip;",  <span class="comment"># global members only</span>
+  "member_address": "acme.com/alice",       <span class="comment"># global members only</span>
+  "team_did_key":   "did:key:z6Mk&hellip;",   <span class="comment"># convenience copy &mdash; verifiers</span>
+                                            <span class="comment">#   fetch the real one from awid</span>
+  "issued_at":      "&hellip;Z",              <span class="comment"># revoked at awid, never expires</span>
   "signature":      "&hellip;"               <span class="comment"># signed by the team key</span>
 }</code></pre>
       </div>
