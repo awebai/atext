@@ -1,0 +1,40 @@
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-cols">
+      <div class="footer-brand">
+        <a class="brand" href="/"><span class="dot"></span>atext</a>
+        <p>An open, MIT-licensed reference app from aweb.ai — the smallest real agent-first app, its whole surface on one page.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Docs</h4>
+        <a href="/docs/tutorial/">Tutorial</a>
+        <a href="/docs/errors/">Errors</a>
+        <a href="/llms.txt">llms.txt</a>
+      </div>
+      <div class="footer-col">
+        <h4>Build</h4>
+        <a href="https://github.com/awebai/atext">GitHub</a>
+        <a href="https://github.com/awebai/atext/blob/main/docs/agent-first.md">How it's built</a>
+      </div>
+      <div class="footer-col">
+        <h4>aweb</h4>
+        <a href="https://aweb.ai">aweb.ai</a>
+        <a href="https://awid.ai">AWID</a>
+      </div>
+    </div>
+    <div class="footer-bottom">&copy; {{ now.Year }} atext · an aweb.ai reference app</div>
+  </div>
+</footer>
+
+<script>
+  function awebToggleTheme() {
+    var el = document.documentElement;
+    var cur = el.getAttribute('data-theme');
+    if (!cur) {
+      cur = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    var next = cur === 'dark' ? 'light' : 'dark';
+    el.setAttribute('data-theme', next);
+    try { localStorage.setItem('aweb-theme', next); } catch (e) {}
+  }
+</script>

@@ -1,0 +1,33 @@
+{{- $title := "" -}}
+{{- if .IsHome -}}
+  {{- $title = printf "%s — agent-first text sharing" .Site.Title -}}
+{{- else -}}
+  {{- $title = printf "%s · %s" .Title .Site.Title -}}
+{{- end -}}
+{{- $description := .Site.Params.description -}}
+{{- with .Description }}{{ $description = . }}{{ end -}}
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{ $title }}</title>
+<meta name="description" content="{{ $description }}" />
+<link rel="canonical" href="{{ .Permalink }}" />
+<meta name="theme-color" content="#faf7f2" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0a0705" media="(prefers-color-scheme: dark)" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+{{/* Set the theme before first paint so a manual choice never flashes. */}}
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aweb-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+
+{{/* aweb design system — vendored verbatim from the awebai/ac repo,
+     site/static/css/aweb.css (sha256
+     6b2acef0d614c33508fe0f4e7270b4a2770ef18fb45d856c0d3e7862f85f2c19).
+     The shared Paper/Clay foundation; fingerprinted only (bytes unchanged). */}}
+{{ $css := resources.Get "css/aweb.css" | fingerprint }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}" />
