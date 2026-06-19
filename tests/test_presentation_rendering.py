@@ -64,8 +64,9 @@ def test_presented_page_default_palette_matches_brand() -> None:
     html = render_presented_page(body="# Hi")
     style = html.split("</style>", 1)[0]
 
-    assert "--bg: #fffaf0;" in style
-    assert "--accent: #246b49;" in style
+    # The default palette is the aweb Paper/Clay system (warm paper + terracotta).
+    assert "--bg: #faf7f2;" in style
+    assert "--accent: #b8482b;" in style
 
 
 def test_presented_page_shows_atext_brand_lockup() -> None:
