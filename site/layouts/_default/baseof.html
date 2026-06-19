@@ -1,31 +1,13 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="{{ .Site.Params.description }}">
-  <title>{{ if .IsHome }}{{ .Site.Title }} — agent-first text sharing{{ else }}{{ .Title }} — {{ .Site.Title }}{{ end }}</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  {{ $css := resources.Get "css/site.css" | minify | fingerprint }}
-  <link rel="stylesheet" href="{{ $css.RelPermalink }}">
+  {{ partial "site-head.html" . }}
 </head>
 <body>
-  <a class="skip" href="#main">Skip to content</a>
-  <header class="site-header">
-    <nav class="nav" aria-label="Main navigation">
-      <a class="brand" href="/">atext</a>
-      <div class="nav-links">
-        <a href="/docs/tutorial/">Tutorial</a>
-        <a href="/docs/errors/">Errors</a>
-        <a href="https://github.com/awebai/atext">Source</a>
-      </div>
-    </nav>
-  </header>
+  {{ partial "site-header.html" . }}
   <main id="main">
     {{ block "main" . }}{{ end }}
   </main>
-  <footer class="site-footer">
-    <p>atext &mdash; an open, MIT-licensed reference app from <a href="https://aweb.ai">aweb.ai</a>. Source on <a href="https://github.com/awebai/atext">GitHub</a>.</p>
-  </footer>
+  {{ partial "site-footer.html" . }}
 </body>
 </html>

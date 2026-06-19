@@ -1,16 +1,21 @@
 {{ define "main" }}
 <section class="page">
-  <header class="page-header">
-    <p class="eyebrow">{{ .Params.eyebrow }}</p>
-    <h1>{{ .Title }}</h1>
-    {{ with .Description }}<p class="lede">{{ . }}</p>{{ end }}
-  </header>
-  <div class="content">
-    {{ .Content }}
+  <div class="wrap">
+    <header class="page-header">
+      {{ with .Params.eyebrow }}<p class="kicker">{{ . }}</p>{{ end }}
+      <h1>{{ .Title }}</h1>
+      {{ with .Description }}<p>{{ . }}</p>{{ end }}
+    </header>
+    <div class="prose">
+      {{ .Content }}
+    </div>
     {{ if .Pages }}
-      <ul class="card-list">
+      <ul class="blog-list-posts">
         {{ range .Pages }}
-          <li><a href="{{ .RelPermalink }}">{{ .Title }}</a><span>{{ .Description }}</span></li>
+          <li><a class="blog-list-post-link" href="{{ .RelPermalink }}">
+            <h3 class="blog-list-post-title">{{ .Title }}</h3>
+            {{ with .Description }}<p class="blog-list-post-summary">{{ . }}</p>{{ end }}
+          </a></li>
         {{ end }}
       </ul>
     {{ end }}

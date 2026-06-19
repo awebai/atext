@@ -1,12 +1,14 @@
 {{ define "main" }}
 <article class="page">
-  <header class="page-header">
-    <p class="eyebrow">{{ .Params.eyebrow }}</p>
-    <h1>{{ .Title }}</h1>
-    {{ with .Description }}<p class="lede">{{ . }}</p>{{ end }}
-  </header>
-  <div class="content">
-    {{ .Content }}
+  <div class="wrap">
+    <header class="page-header">
+      {{ with .Params.eyebrow }}<p class="kicker">{{ . }}</p>{{ end }}
+      <h1>{{ .Title }}</h1>
+      {{ with .Description }}<p>{{ . }}</p>{{ end }}
+    </header>
+    <div class="prose">
+      {{ .Content }}
+    </div>
   </div>
 </article>
 {{ end }}
