@@ -38,3 +38,50 @@
     try { localStorage.setItem('aweb-theme', next); } catch (e) {}
   }
 </script>
+
+<script>
+  // Standard llms.txt split-button control (header). Copies the page's llms.txt
+  // to the clipboard; the caret opens an opaque menu (Copy for LLMs / Open
+  // llms.txt). Byte-consistent with the aweb-naapp toolkit control.
+  (function () {
+    Array.prototype.forEach.call(document.querySelectorAll('.split-btn'), function (sb) {
+      var url = sb.getAttribute('data-llms-url');
+      var caret = sb.querySelector('.split-btn__caret');
+      var main = sb.querySelector('.split-btn__main');
+      var label = main ? main.querySelector('.split-btn__label') : null;
+      function items() { return Array.prototype.slice.call(sb.querySelectorAll('.split-btn__item')); }
+      function close() { sb.setAttribute('data-open', 'false'); if (caret) caret.setAttribute('aria-expanded', 'false'); }
+      function open() { sb.setAttribute('data-open', 'true'); if (caret) caret.setAttribute('aria-expanded', 'true'); }
+      function doCopy() {
+        fetch(url).then(function (r) { return r.text(); }).then(function (text) {
+          navigator.clipboard.writeText(text).then(function () {
+            if (!main) return;
+            main.classList.add('copied');
+            if (label) label.textContent = 'Copied!';
+            main.setAttribute('aria-label', 'Copied to clipboard');
+            setTimeout(function () {
+              main.classList.remove('copied');
+              if (label) label.textContent = 'llms.txt';
+              main.setAttribute('aria-label', 'Copy llms.txt to clipboard');
+            }, 1600);
+          });
+        });
+      }
+      Array.prototype.forEach.call(sb.querySelectorAll('[data-llms-copy]'), function (b) {
+        b.addEventListener('click', function () { doCopy(); if (b.getAttribute('role') === 'menuitem') close(); });
+      });
+      if (caret) caret.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (sb.getAttribute('data-open') === 'true') { close(); } else { open(); var it = items()[0]; if (it) it.focus(); }
+      });
+      sb.addEventListener('keydown', function (e) {
+        if (sb.getAttribute('data-open') !== 'true') return;
+        var list = items(); var i = list.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown') { e.preventDefault(); (list[i + 1] || list[0]).focus(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); (list[i - 1] || list[list.length - 1]).focus(); }
+        else if (e.key === 'Escape') { close(); if (caret) caret.focus(); }
+      });
+      document.addEventListener('click', function (e) { if (!sb.contains(e.target)) close(); });
+    });
+  })();
+</script>
