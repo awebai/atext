@@ -12,16 +12,21 @@ Hard evidence from the library aafv landing:
   agents from the PUBLIC catalog (a test asserts it must not touch the shelf), so
   the running agents were public-pinned; the real bridge was `aw team adopt`
   (shipped later in 1.32.3), and the loop closes with `aw team refresh`.
-- `aw library propose` is schema-correct but could not run as a one-liner — the
-  CLI rejects an object body param (interpret.go convertBodyValue); the aw e2e
-  submits proposals via `aw id request POST /v1/proposals` instead. A
-  schema-verified `aw library propose ...` panel would have shipped a command
-  that does not run — and that same class of bug reached the published skills.
+- The broken thing was the `--body-file` FLAG (silently dropped for library
+  verbs), NOT the `aw library propose` verb. Execution-proven on 1.32.3: propose
+  DOES run as a one-liner with inline content —
+  `aw library propose --target profile --profile_ref <ref> --content "$(cat proposal.json)" --summary ... --rationale ...`.
+  So never show `--body-file` for a library verb, and do NOT point anything at
+  raw `aw id request POST /v1/proposals` — the verb works. (A schema read had me
+  briefly believing the verb itself was unrunnable; it is not.)
 
 Rules:
 - Before publishing a command JOURNEY, get it EXECUTED against a throwaway
   team/shelf and copy the sequence that actually ran. The aweb team can do this;
   ask for the executed transcript, not a schema answer.
+- "Executed" means THROUGH the validating step, not to the first `201`. A write
+  verb happily `201`s a body that a later step `422`s — e.g. `propose` accepts
+  content that `approve` rejects. Run the loop to the step that validates.
 - The best source of a real flow is the repo's e2e tests (they run the stack) —
   read `cli/go/e2e/*` and `test_*_e2e.py`, and heed their comments (they call out
   verbs they avoid because of bugs).
