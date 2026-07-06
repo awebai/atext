@@ -16,8 +16,12 @@ approve (`aw library approve`) → `aw team refresh` applies the mint. The gener
 
 Corollaries proven the hard way on this landing:
 - Every command shown as a copiable panel must be one a human actually RUNS.
-  `aw library propose` is the *agent's* autonomous action (team cert), not a
-  human copy-run step — so it is described, never panelled. This also dodged a
-  CLI verb that could not run as a one-liner. See [[aweb-command-flows-verify-by-execution]].
+  A proposal against the shelf is framed actor-neutrally ("a proposal is
+  submitted … you approve") and shown as description, not a panel — an agent
+  proposing is not the reader's copy-run step, and the published profiles do not
+  yet propose autonomously (a copy flip waits on that becoming true). NOTE: the
+  `aw library propose` verb DOES run as a one-liner (with `--content`, never the
+  silently-broken `--body-file`); it is described, not panelled, by editorial
+  choice, not because it cannot run. See [[aweb-command-flows-verify-by-execution]].
 - Don't ship the step ORDER on a guess; the end-to-end sequence must be verified
   by EXECUTION against a throwaway shelf, not by reading the manifest schema.
