@@ -113,3 +113,10 @@ log holds my 503s + the consolidated root cause above. Both surface to Juan.
 - **Directory:** `/Users/juanre/prj/awebai/atext/agents/instances/coordinator` (correct home; `pwd` confirmed)
 - **What I did:** retried each in a bounded loop (no sleep; foreground sleep is blocked). All three SUCCEEDED on retry — reviewer mail (baca8ca3), dev-2 mail (9a5bf0cc), board comment.
 - **Affected/lost:** nothing. Genuine transient registry 503; recovered within the retry loop.
+
+### Incident 6 — decrypting an inbound ac-developer-2 chat message
+- **Timestamp:** 2026-06-19 17:47 WEST
+- **Command:** the channel's auto-decrypt of an inbound encrypted chat (`aw chat history --session-id c0e36aaf... --message-id ab69bf6d... --json`) failed with `http 503: {"detail":"AWID registry unavailable"}` — so the message arrived `decrypted=false`.
+- **Directory:** `/Users/juanre/prj/awebai/atext/agents/instances/coordinator` (correct home; `pwd` confirmed)
+- **What I did:** retried `aw chat history` for that message in a bounded loop — RECOVERED on retry; read the plaintext (a routine ac-developer-2 ack, nothing actionable).
+- **Affected/lost:** nothing. Genuine transient registry 503 on the inbound decrypt path; recovered on retry. NOTE: this is the first 503 observed on the message-DECRYPT/read path (prior incidents were on sends) — same registry flap, just surfaced as `decrypt_error` on an inbound; the fix is the same (retry).
