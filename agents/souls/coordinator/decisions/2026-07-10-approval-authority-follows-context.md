@@ -46,3 +46,12 @@ reality, approved. Library minted operations 0.1.2; `aw team refresh
 - SOT + aw-coordinator's "strictly-human" note: notified for update.
 - Review discipline unchanged: read the actual diff, verify claims against
   reality, judge; never approve on the summary alone.
+
+## Boundary clarified 2026-07-16 (aida's correction, accepted)
+
+Cross-team reviewing is a BOOTSTRAP condition, not a standing right. I
+approved aweb.ai mints while that team had no staffed reviewing authority;
+once it did (sofia/Direction), its shelf approvals belong to its own
+reviewing authority plus human override. aida enforced this unprompted on
+her first proposal (70512378, routed to Direction, declining my fast
+external approval) — the design maturing as intended.
