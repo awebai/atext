@@ -13,3 +13,4 @@ One fact per file, indexed here. See the `self-maintenance` skill.
 - [aw materializer rejects folded scalars](aw-materializer-multibyte-utf8-bug.md) — use `>-` or plain scalars in profile.yaml (not bare `>`); the trailing newline trips aw's validator, not multibyte UTF-8.
 - [upcoming-marketing-blueprint](upcoming-marketing-blueprint.md) — Juan's next: a marketing blueprint (`aweb.marketing`, confirmed a blueprint not an app), first profile a proofreader that reviews copy/web pages.
 - [ai.aweb workspace-key exposure incident](ai-aweb-repo-key-exposure-incident.md) — signing keys were safe (symlinks into private co.aweb); workspace.yaml api_keys were the real exposure; repo flipped private 2026-07-10, rotation pending.
+- [Measure conditions, not counts](extract-conditions-not-counts.md) — grep tallies are blind to behaviour; extract the guard+config, dedupe your own tool calls out, and verify the instrument can see the phenomenon before trusting a null.
