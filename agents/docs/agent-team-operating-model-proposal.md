@@ -1,8 +1,8 @@
 # Agent-team operating model
 
-Status: implementation-preparation draft, revised for multi-host operation  
-Date: 2026-07-24  
-Decision owner: Juan  
+Status: implementation-preparation draft, revised for multi-host operation and durable service identity
+Date: 2026-07-24; latest revision 2026-07-31
+Decision owner: Juan
 
 ## Purpose
 
@@ -55,6 +55,18 @@ A durable soul may exist without a running process. A durable identity may
 exist without a running process. A profile in a catalog does not imply a
 staffed role. Only work that has a current outcome, owner, trigger, and queue
 justifies a live agent instance.
+
+Durability has three independent dimensions:
+
+- **role continuity** comes from the committed soul and reviewed knowledge;
+- **relationship continuity** comes from a stable aweb identity, address,
+  memberships, mailbox, and authority;
+- **execution continuity** comes from an OAS instance or resumable session.
+
+None requires the other two to share its lifetime. In particular, the reason
+for a persistent global identity is stable addressability and trust, not model
+memory. A public support or coordination address must survive model changes,
+session replacement, host movement, and periods with no running model.
 
 Host placement is not determined by how long a role exists. It is determined
 by what the current instance needs:
@@ -223,6 +235,12 @@ OAS should be the normal internal mechanism for starting and ending agent
 work. Repository-specific instance scripts and aweb's simpler team launcher
 remain compatibility or onboarding paths, not the primary internal runtime.
 
+An OAS instance is an execution and working-state container. It is not
+necessarily the public principal customers or other teams address. Some
+interactive coordinators may deliberately bind one durable identity to one
+long-lived instance. Service roles should be able to retain one public
+identity while replacing or multiplying the sessions that handle its queue.
+
 OAS is currently a single-host executor. `oas spawn` creates an instance and
 launches it in tmux on the machine where the command runs. `oas status --team`
 can discover local sibling repositories, and `oas aweb roster` can list
@@ -289,11 +307,16 @@ aweb owns:
 - event delivery and wake signals;
 - the cross-machine roster.
 
-The OAS aweb integration must distinguish two identity lifetimes:
+The OAS aweb integration must distinguish three identity uses:
 
-- **durable identities**, such as Merlin, Minerva, Aida, and Hestia, are
-  adopted into an OAS instance without changing their keys or authority and
-  are never deleted merely because one instance is retired;
+- **durable personal/coordinator identities**, such as Merlin or Alice, may
+  be adopted into one long-lived OAS instance without changing their keys or
+  authority and are never deleted merely because a session or instance is
+  retired;
+- **durable service identities**, such as Aida or Hestia, own the stable
+  public address, mailbox, memberships, and policy while replaceable OAS
+  sessions or task instances handle their work through routing and scoped
+  delegation;
 - **task-scoped identities**, such as ordinary developers and reviewers, may
   be minted at spawn and revoked at retirement.
 
@@ -302,8 +325,18 @@ verification fails. A warning followed by a nominally successful spawn is
 not safe enough for coordinated work.
 
 A global identity is a durable address and authority decision. It does not
-imply a permanently running process. Ordinary task workers and reviewers
-should normally use local team identities.
+imply a permanently running process, one permanent OAS directory, or one
+unchanging model. Ordinary task workers and reviewers should normally use
+local team identities.
+
+The permanent signing identity must have one deliberate custody boundary. Its
+private key and `.aw` state must not be copied among worker homes to make
+several processes appear to be the same agent. A routed worker instead
+receives narrowly scoped, time-bounded authority to act for the durable
+identity, and every action remains attributable to both the service identity
+and the actual worker/session. Until aweb supports that delegation safely,
+one active runner per durable identity remains the conservative implementation
+constraint rather than the desired ontology.
 
 The aweb-specific OAS adapter is an aweb-owned package in the aweb monorepo,
 following the same ownership pattern as the Pi adapter. Generic lifecycle
@@ -316,6 +349,63 @@ improvements belong upstream in OAS. The adapter owns:
 
 Remote host dispatch is a later layer over this seam, not part of its first
 release.
+
+### Persistent service identities and replaceable execution
+
+The effort behind persistent global IDs exists to preserve a relationship,
+not a process. A customer, agent, webhook, or external organization needs one
+address it can remember and authorize. Messages must remain deliverable while
+no model is running, and later replies must remain attributable to the same
+principal. Team certificates, revocation, conversation history, audit trail,
+and reputation must not reset for every ticket or model session.
+
+Customer support is the canonical example:
+
+```text
+aweb.ai/aida
+  durable did:aw, address, memberships, mailbox, policy, key custody
+        |
+        v
+  authenticated router / queue dispatcher
+        |
+        +--> fresh OAS session for request 1
+        +--> resumed OAS session for request 2
+        +--> isolated worker instance for request 3
+        |
+        v
+  Aida soul + reviewed support knowledge + recorded outcomes
+```
+
+The public identity remains stable while sessions start, stop, resume, move
+between authorized hosts, or use a different model. Learning continuity comes
+from the soul, project sources of truth, and reviewed knowledge promotion; it
+is related to the identity but is not stored in the identity and is not the
+reason the ID must persist.
+
+The missing primitive is routing with delegation:
+
+- a durable mailbox accepts work without requiring live compute;
+- a dispatcher selects or starts the right soul and execution environment;
+- a lease prevents accidental duplicate ownership of one work item;
+- delegated credentials bind authority by team, operation, request, worker,
+  host, and time;
+- concurrent workers, when allowed, keep distinct OAS instance and session
+  IDs instead of sharing private identity state;
+- replies and mutations record both the durable principal and delegated actor;
+- revoking one worker does not destroy the public service identity.
+
+This model permits two valid patterns:
+
+1. **Long-lived conversational instance** — useful for Merlin, Alice, or a
+   coordinator Juan speaks to directly. Sessions may still be replaced while
+   the instance and identity remain together.
+2. **Routed service identity** — appropriate for support, operations, PR
+   handling, or event-driven work. The identity and queue are permanent;
+   handlers are replaceable and may eventually run concurrently under scoped
+   delegation.
+
+Keeping one supervised Aida instance on Hetzner is therefore a sensible first
+implementation, not the final definition of Aida.
 
 ### Library: cross-boundary role distribution
 
@@ -369,21 +459,29 @@ Git remains the authority for:
 Library is a release/distribution surface, not a replacement for reviewable
 source.
 
-## Three kinds of residence
+## Four kinds of residence
 
-Asking where an agent lives has three different answers:
+Asking where an agent lives has four different answers:
 
 1. **Durable home:** the committed soul in the repository that owns the
    agent's responsibility.
-2. **Execution home:** the machine-local instance directory and worktree for
+2. **Identity custody:** the protected location or service controlling the
+   durable identity's keys, memberships, delegation, and recovery policy.
+3. **Execution home:** the machine-local instance directory and worktree for
    one piece of active work.
-3. **Coordination address:** the aweb team or global identity through which
-   the instance can be reached.
+4. **Coordination address:** the stable aweb identity or team address through
+   which the role can be reached, whether or not an instance is running.
 
 The authoritative soul lives in Git rather than on one favored computer.
 Every authorized host may have a clone. Instance homes, logs, worktrees,
 runtime credentials, and sessions remain local to the host and are normally
 gitignored.
+
+Identity custody is neither the soul repository nor necessarily the execution
+home. A self-custodial conversational agent may keep it in one protected
+instance home. A service identity may instead keep it behind a supervised
+router and issue delegated credentials to replaceable workers. The address
+must not change merely because either execution layout changes.
 
 The canonical future layout should follow OAS directly:
 
@@ -466,11 +564,15 @@ Place an instance by asking, in order:
 6. Does it require a specialized machine capability? If yes, dispatch to a
    registered host with that capability.
 
-No persistent identity should run concurrently on two hosts. A soul may have
-multiple task instances, but a stable service identity such as Aida or Hestia
-has one active runner. If a role truly needs both an interactive and a
-service presence, use two explicitly named instances with different
-authorities rather than pretending they are one process.
+No persistent identity's root signing state should be copied onto two hosts.
+A soul may have multiple task instances. Before scoped delegation exists, a
+stable service identity such as Aida or Hestia must have one active runner.
+After delegation exists, it may have multiple concurrent workers on one or
+more authorized hosts, provided each has a distinct instance identity, a
+bounded lease and credential, and an auditable relationship to the service
+principal. If two presences actually have different responsibilities or
+authorities, use two explicitly named identities rather than pretending they
+are one service.
 
 Host location must come from live instance metadata and the aweb roster, not
 handoff prose. Current documents already demonstrate why: Aida's 2026-07-13
@@ -657,9 +759,12 @@ Examples:
 - a campaign invokes Outreach;
 - a material strategic decision invokes Direction.
 
-Aida and Hestia retain stable global identities and one active runner each.
-Their model sessions may sleep between events; their listeners, queues,
-supervisors, and identity continuity remain available.
+Aida and Hestia retain stable global service identities. Initially each may
+use one supervised active runner because safe delegation is not yet present.
+The target architecture lets their listeners and queues dispatch replaceable
+request handlers without changing the public address or copying the root key.
+Model sessions may sleep between events; mailbox, routing, supervision, and
+identity continuity remain available.
 
 ### Development
 
@@ -742,8 +847,10 @@ worktree." The contract is a pushed exact SHA plus reproducible evidence.
 
 ### Support and operations
 
-1. An inbound customer event wakes Aida on Hetzner.
-2. Aida handles safe, known support work within policy.
+1. An inbound customer event reaches Aida's durable mailbox and wakes her
+   current supervised handler—or causes the router to start one—on Hetzner.
+2. The handler acts for Aida within its request-scoped policy and records the
+   durable identity plus actual worker/session provenance.
 3. A product question or bug becomes a durable task in the owning product
    team; Aida does not silently become its developer.
 4. Operational evidence routes to Hestia.
@@ -786,10 +893,18 @@ Merlin consolidates only the items that need Juan's attention. This is how
 CJR helps manage everything without becoming the task coordinator for every
 project.
 
-## Long-lived-agent test
+## Durability and long-lived-agent tests
 
-An agent identity or instance may be durable without its model process
-running. A process should be continuously available only when all are true:
+An identity should be durable when correspondents need stable addressability,
+trust, membership, authorization, or queued delivery across pieces of work.
+That decision is independent of whether an instance or process persists.
+
+An OAS instance should be long-lived only when retaining its working state or
+resumable session materially improves the role. It must still be replaceable
+from its soul, durable artifacts, identity policy, and current work record.
+
+A process or dispatcher should be continuously available only when all are
+true:
 
 1. it owns a recurring outcome or queue;
 2. it has a real wake source;
@@ -800,8 +915,10 @@ running. A process should be continuously available only when all are true:
 7. silence has an explicit meaning and detection path.
 
 If it needs durable context but not uninterrupted availability, preserve the
-instance and start sessions when needed. If it needs neither, retain only the
-soul/profile and spawn a clean instance for real work.
+instance and start sessions when needed. If it needs a stable public
+relationship but not persistent working state, preserve the identity and
+mailbox while dispatching clean handlers. If it needs neither, retain only the
+soul/profile and spawn a clean task identity and instance for real work.
 
 ## Dependency posture toward OAS
 
@@ -925,8 +1042,10 @@ home:    ~/prj/awebai/aweb/oas/agents/oas-coord/instances/alice
 `oas-coord` is the reusable soul/type; `alice` is one concrete agent and OAS
 instance of that type. Alice's aweb identity is durable and must remain
 independent of model sessions and task-instance retirement. More instances of
-the same soul are possible, but each is a distinct agent with its own identity;
-one permanent global identity has only one active runner at a time.
+the same soul are possible, but each is a distinct agent with its own identity.
+Alice currently follows the long-lived conversational-instance pattern. The
+one-runner rule protects her root identity until delegated execution exists;
+it is not a claim that all durable identities require permanent instances.
 
 A separate clean coordinator plus fresh developer and reviewer instances
 should implement:
@@ -1057,8 +1176,8 @@ The pilot succeeds only if it proves:
      operations agents.
 6. **aweb.ai company**
    - establish one accountable local company coordinator;
-   - preserve Aida and Hestia as supervised Hetzner services with one runner
-     each;
+   - preserve Aida and Hestia as supervised Hetzner service identities, using
+     one runner each only until scoped delegated handlers are available;
    - convert fanciful or inactive permanent surfaces into invoked souls;
    - retain global identities only where durable reachability is valuable.
 7. **TSM**
@@ -1083,8 +1202,8 @@ knowledge, and authority have been classified and preserved.
 - Every active task has a current owner, next action, and evidence path.
 - No stale claim survives silently.
 - No role runs merely because a profile exists.
-- Aida and Hestia survive disconnects and host restarts without human tmux
-  repair.
+- Aida's and Hestia's durable endpoints accept queued work across disconnects
+  and host restarts, and supervised handlers recover without human tmux repair.
 - Juan-facing coordinators and browser work are local.
 - Backend work and all independent reviews can be dispatched to Hetzner from
   the local control desk.
@@ -1120,3 +1239,7 @@ knowledge, and authority have been classified and preserved.
 10. After agreement, which repository becomes the authoritative home for this
     operating model: CJR, `ai.aweb`, or a dedicated organization-operations
     repository?
+11. Which aweb primitive should own durable service mailboxes, leases,
+    delegated worker credentials, and reply attribution?
+12. Where should self-custodial service identity keys live so handlers can
+    move across authorized hosts without copying root `.aw` state?
