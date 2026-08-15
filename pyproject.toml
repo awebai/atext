@@ -54,6 +54,11 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+# agents/instances/<name>/work is a symlink back to the repo root, so
+# collection that starts anywhere but tests/ recurses through it until
+# paths hit PATH_MAX. testpaths alone is not enough: it is ignored the
+# moment pytest is given an explicit path (pytest .).
+norecursedirs = ["agents"]
 asyncio_mode = "auto"
 markers = [
   "e2e: docker-backed end-to-end tests using real aw/awid tooling",
