@@ -224,3 +224,12 @@ Configuration is environment-driven:
 - `ATEXT_DEFAULT_PRESENT_TTL_SECONDS` — default present-link TTL, default `86400`.
 - `ATEXT_MAX_PRESENT_TTL_SECONDS` — max present-link TTL, default `604800`.
 - `ATEXT_AUTH_CACHE_TTL_SECONDS` — AWID auth cache TTL, default `600`.
+
+### Revocation lookup bounds
+
+Team authentication reads the complete AWID certificate history, including revoked
+certificates, in pages of 200. A refresh may read at most 100 pages (20,000 records).
+If more pages remain, pagination does not advance, or the response is incomplete,
+the request fails closed with HTTP 503 and no partial facts enter the cache.
+An expired cache entry is never used after a failed refresh. A revoked certificate
+returns HTTP 401; the existing cache TTL still governs revocation freshness.
